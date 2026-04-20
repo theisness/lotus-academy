@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 theme configuration
+ * Color system: Zinc/Slate neutral base + Emerald accent
+ * Fonts: Geist Sans + Geist Mono (via CSS variables set in layout.tsx)
+ */
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Emerald accent palette */
+  --color-accent-50: #ecfdf5;
+  --color-accent-100: #d1fae5;
+  --color-accent-200: #a7f3d0;
+  --color-accent-300: #6ee7b7;
+  --color-accent-400: #34d399;
+  --color-accent-500: #10b981;
+  --color-accent-600: #059669;
+  --color-accent-700: #047857;
+  --color-accent-800: #065f46;
+  --color-accent-900: #064e3b;
+  --color-accent-950: #022c22;
+}
+
+/*
+ * Design system CSS custom properties
+ * Neutral base: Zinc tones
+ * Accent: Emerald (single high-contrast accent, no purple/blue)
+ */
+:root {
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-text: #18181b;
+  --color-text-muted: #71717a;
+  --color-text-subtle: #a1a1aa;
+  --color-accent: #10b981;
+  --color-accent-hover: #059669;
+  --color-accent-muted: #d1fae5;
+  --color-border: #e4e4e7;
+  --color-border-subtle: #f4f4f5;
+  --color-error: #ef4444;
+  --color-error-muted: #fef2f2;
+}
+
+/*
+ * Base styles
+ */
+body {
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * Selection highlight using accent color
+ */
+::selection {
+  background-color: var(--color-accent-muted);
+  color: var(--color-text);
+}
+
+/*
+ * Utility: hide scrollbar while keeping scroll functionality
+ * Used by CategoryTabs horizontal scroll
+ */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
