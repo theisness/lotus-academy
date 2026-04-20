@@ -22,11 +22,21 @@ export function useMessages(): UseMessagesReturn {
   /**
    * 从数据库获取当前用户的所有消息
    * 通过 user_messages 关联查询 messages 表，按创建时间倒序排列
+   * 未登录时跳过查询，避免无效 JWT 导致错误
    */
   const fetchMessages = useCallback(async () => {
     setLoading(true)
 
     try {
+      // 先检查是否有有效会话，未登录时跳过查询
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setMessages([])
+        setUnreadCount(0)
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase
         .from('user_messages')
         .select(`
@@ -46,7 +56,7 @@ export function useMessages(): UseMessagesReturn {
             created_at
           )
         `)
-        .order('message_id', { referencedTable: 'messages', ascending: false })
+        .order('created_at', { referencedTable: 'messages', ascending: false })
 
       if (error) {
         throw new Error(error.message)

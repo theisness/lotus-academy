@@ -34,10 +34,14 @@ CREATE POLICY profiles_select ON profiles
     auth.uid() = id OR is_admin()
   );
 
--- UPDATE: 管理员可修改所有用户（角色、标签等），普通用户仅修改自己的昵称、头像、简介、页面偏好
+-- UPDATE: 普通用户仅修改自己的昵称、头像、简介、页面偏好（不可修改 role 和 group_tags）
 CREATE POLICY profiles_update_self ON profiles
   FOR UPDATE USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
+  WITH CHECK (
+    auth.uid() = id
+    AND role = (SELECT p.role FROM profiles p WHERE p.id = auth.uid())
+    AND group_tags = (SELECT p.group_tags FROM profiles p WHERE p.id = auth.uid())
+  );
 
 -- 管理员可更新任何用户的 profile（包括 role 和 group_tags）
 CREATE POLICY profiles_update_admin ON profiles

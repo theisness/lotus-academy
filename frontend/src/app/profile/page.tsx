@@ -148,9 +148,9 @@ export default function ProfilePage() {
       setProfileFeedback(null)
 
       try {
-        // Generate unique file path
+        // Generate unique file path (bucket is already 'avatars', so path is relative within it)
         const ext = file.name.split('.').pop() || 'jpg'
-        const filePath = `avatars/${user.id}/${Date.now()}.${ext}`
+        const filePath = `${user.id}/${Date.now()}.${ext}`
 
         // Upload to Supabase Storage
         const { error: uploadError } = await supabase.storage

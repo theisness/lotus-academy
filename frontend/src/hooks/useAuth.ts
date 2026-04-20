@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session, UserResponse } from '@supabase/supabase-js'
 import type { UserProfile } from '@/types/database'
 import type { AuthResult } from '@/types/common'
 import type { UseAuthReturn } from '@/types/hooks'
@@ -59,13 +59,27 @@ export function useAuth(): UseAuthReturn {
       setLoading(false)
     })
 
-    // 初始化时获取当前会话
-    supabase.auth.getSession().then(async ({ data: { session } }: { data: { session: Session | null } }) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        setUser(profile)
-        setIsAdmin(profile?.role === 'admin')
+    // 初始化时验证当前会话
+    // 使用 getUser() 向服务器验证 token 有效性，而非仅读取本地缓存
+    supabase.auth.getUser().then(async (response: UserResponse) => {
+      const { data: { user: authUser }, error } = response
+      if (error || !authUser) {
+        // 仅当确实存在无效 session 时才清除，
+        // 对于完全未登录的用户不调用 signOut()，避免干扰匿名请求
+        if (error?.message?.includes('JWS') || error?.message?.includes('JWT')) {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            await supabase.auth.signOut()
+          }
+        }
+        setUser(null)
+        setIsAdmin(false)
+        setLoading(false)
+        return
       }
+      const profile = await fetchProfile(authUser.id)
+      setUser(profile)
+      setIsAdmin(profile?.role === 'admin')
       setLoading(false)
     })
 

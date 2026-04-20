@@ -45,6 +45,33 @@ export function useBooks(type: ShelfType): UseBooksReturn {
       const { data, error: fetchError } = await query
 
       if (fetchError) {
+        // JWT 签名无效或 401 未授权时，说明存在过期/损坏的会话 token
+        // 清除无效会话后重试，让请求以匿名身份执行
+        const isAuthError = fetchError.message?.includes('JWS')
+          || fetchError.message?.includes('JWT')
+          || fetchError.message?.includes('invalid')
+          || fetchError.code === 'PGRST301'
+          || (fetchError as unknown as { status?: number }).status === 401
+        if (isAuthError) {
+          await supabase.auth.signOut()
+          let retryQuery = supabase
+            .from('books')
+            .select('*')
+            .eq('type', type)
+            .order('created_at', { ascending: false })
+
+          if (searchQuery.trim()) {
+            retryQuery = retryQuery.ilike('title', `%${searchQuery.trim()}%`)
+          }
+
+          const { data: retryData, error: retryError } = await retryQuery
+
+          if (retryError) {
+            throw new Error(retryError.message)
+          }
+          setBooks((retryData as Book[]) ?? [])
+          return
+        }
         throw new Error(fetchError.message)
       }
 

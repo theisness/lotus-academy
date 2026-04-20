@@ -6,10 +6,14 @@ CREATE POLICY "books_upload" ON storage.objects
     bucket_id = 'books' AND auth.uid() IS NOT NULL
   );
 
--- 允许已登录用户读取（RLS 在 books 表层面已控制可见性）
+-- 允许已登录用户读取，或匿名用户读取 public/ 目录下的文件
 CREATE POLICY "books_read" ON storage.objects
   FOR SELECT USING (
-    bucket_id = 'books' AND auth.uid() IS NOT NULL
+    bucket_id = 'books'
+    AND (
+      auth.uid() IS NOT NULL
+      OR (storage.foldername(name))[1] = 'public'
+    )
   );
 
 -- 允许上传者删除自己的文件

@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   WarningCircle,
@@ -56,9 +55,7 @@ function fileNameToTitle(name: string): string {
 }
 
 export function BookshelfClient() {
-  const router = useRouter()
-  const { user, isAdmin, loading: authLoading } = useAuthContext()
-  const preferenceChecked = useRef(false)
+  const { user, isAdmin } = useAuthContext()
   const {
     books,
     loading: booksLoading,
@@ -90,16 +87,8 @@ export function BookshelfClient() {
 
   const supabase = createClient()
 
-  // 页面偏好重定向：已登录用户偏好为 private 时跳转到个人书架
-  useEffect(() => {
-    if (authLoading || preferenceChecked.current) return
-    if (user?.page_preference === 'private') {
-      preferenceChecked.current = true
-      router.replace('/bookshelf/private')
-    } else {
-      preferenceChecked.current = true
-    }
-  }, [authLoading, user, router])
+  // 注意：页面偏好仅影响 Navbar 默认高亮，不在此处做重定向，
+  // 避免用户主动导航到公共书架时被弹回。
 
   // Fetch book IDs for the selected category
   useEffect(() => {

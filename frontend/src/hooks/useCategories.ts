@@ -37,6 +37,26 @@ export function useCategories(shelfType: ShelfType): UseCategoriesReturn {
         .order('sort_order', { ascending: true })
 
       if (error) {
+        // JWT 签名无效或 401 未授权时，清除无效会话后重试
+        const isAuthError = error.message?.includes('JWS')
+          || error.message?.includes('JWT')
+          || error.message?.includes('invalid')
+          || error.code === 'PGRST301'
+          || (error as unknown as { status?: number }).status === 401
+        if (isAuthError) {
+          await supabase.auth.signOut()
+          const { data: retryData, error: retryError } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('shelf_type', shelfType)
+            .order('sort_order', { ascending: true })
+
+          if (retryError) {
+            throw new Error(retryError.message)
+          }
+          setCategories((retryData as Category[]) ?? [])
+          return
+        }
         throw new Error(error.message)
       }
 
