@@ -19,7 +19,7 @@ import { PdfReader } from './PdfReader'
  *
  * 负责：
  * 1. 根据 bookId 从数据库加载书籍信息
- * 2. 生成 Supabase Storage 的 PDF 文件签名 URL
+ * 2. 通过 Supabase 客户端下载 PDF 并生成 Blob URL
  * 3. 判断当前用户的批注权限（canAnnotate）
  * 4. 渲染 PdfReader 组件
  */
@@ -45,7 +45,12 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
   const [error, setError] = useState<string | null>(null)
 
   /**
-   * 加载书籍信息并生成 PDF 文件签名 URL
+   * 加载书籍信息并下载 PDF 文件生成 Blob URL
+   *
+   * 使用 supabase.storage.download() 而非 createSignedUrl()，
+   * 因为签名 URL 由浏览器直接请求，不会携带 apikey 头，
+   * 会被 Kong 网关拦截返回 401。通过 JS 客户端下载则自动
+   * 携带 apikey，再转为本地 Blob URL 供 PdfLoader 使用。
    */
   const loadBook = useCallback(async () => {
     setLoading(true)
@@ -66,16 +71,18 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
       const bookRecord = bookData as Book
       setBook(bookRecord)
 
-      // 生成 Supabase Storage 签名 URL（有效期 1 小时）
-      const { data: signedData, error: signedError } = await supabase.storage
+      // 通过 Supabase 客户端下载 PDF 文件（自动携带 apikey）
+      const { data: fileData, error: downloadError } = await supabase.storage
         .from('books')
-        .createSignedUrl(bookRecord.file_path, 3600)
+        .download(bookRecord.file_path)
 
-      if (signedError || !signedData?.signedUrl) {
-        throw new Error('无法获取 PDF 文件链接')
+      if (downloadError || !fileData) {
+        throw new Error('无法下载 PDF 文件')
       }
 
-      setFileUrl(signedData.signedUrl)
+      // 将 Blob 转为本地 URL 供 PdfLoader 使用
+      const blobUrl = URL.createObjectURL(fileData)
+      setFileUrl(blobUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
@@ -88,6 +95,15 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
       loadBook()
     }
   }, [loadBook, authLoading])
+
+  // 组件卸载时释放 Blob URL，避免内存泄漏
+  useEffect(() => {
+    return () => {
+      if (fileUrl && fileUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(fileUrl)
+      }
+    }
+  }, [fileUrl])
 
   /**
    * 判断当前用户是否可以批注

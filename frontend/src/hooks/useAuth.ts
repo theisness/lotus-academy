@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import type { UserProfile } from '@/types/database'
 import type { AuthResult } from '@/types/common'
 import type { UseAuthReturn } from '@/types/hooks'
@@ -46,7 +47,7 @@ export function useAuth(): UseAuthReturn {
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         setUser(profile)
@@ -59,7 +60,7 @@ export function useAuth(): UseAuthReturn {
     })
 
     // 初始化时获取当前会话
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }: { data: { session: Session | null } }) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         setUser(profile)

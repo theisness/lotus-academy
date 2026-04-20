@@ -65,10 +65,14 @@ export function useAnnotations(bookId: string): UseAnnotationsReturn {
    */
   const addAnnotation = useCallback(
     async (data: AnnotationInput): Promise<Annotation> => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('未登录')
+
       const { data: inserted, error } = await supabase
         .from('annotations')
         .insert({
           book_id: bookId,
+          user_id: user.id,
           type: data.type,
           position: data.position,
           color: data.color || null,

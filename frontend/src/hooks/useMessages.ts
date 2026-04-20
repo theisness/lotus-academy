@@ -63,7 +63,7 @@ export function useMessages(): UseMessagesReturn {
           read_at: item.read_at as string | null,
           message: item.message as MessageWithDetails['message'],
         }))
-        .sort((a, b) =>
+        .sort((a: MessageWithDetails, b: MessageWithDetails) =>
           new Date(b.message.created_at).getTime() -
           new Date(a.message.created_at).getTime()
         )

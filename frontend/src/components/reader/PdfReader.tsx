@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import React from 'react'
-import { GlobalWorkerOptions } from 'pdfjs-dist'
+import { version as pdfjsVersion, GlobalWorkerOptions } from 'pdfjs-dist'
 import {
   PdfLoader,
   PdfHighlighter,
@@ -28,10 +28,7 @@ import { HighlightPopup } from './HighlightPopup'
 import 'react-pdf-highlighter-extended/dist/esm/style/TextHighlight.css'
 import 'react-pdf-highlighter-extended/dist/esm/style/PdfHighlighter.css'
 
-GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.mjs`
 
 /**
  * PdfReader — PDF 阅读器核心组件
@@ -279,7 +276,7 @@ export function PdfReader({
       {/* 主内容区 */}
       <div className="relative flex flex-1 overflow-hidden">
         {/* PDF 阅读器 */}
-        <div className="flex-1 overflow-auto">
+        <div className="relative flex-1 overflow-auto">
           <PdfLoader
             document={fileUrl}
             beforeLoad={() => (
@@ -369,7 +366,7 @@ function PdfHighlighterWithPages({
   return (
     <PdfHighlighter
       pdfDocument={pdfDocument}
-      style={{ height: '100%', position: 'relative' }}
+      style={{ height: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       {...props}
     >
       {children}

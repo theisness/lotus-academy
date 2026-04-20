@@ -168,7 +168,7 @@ export function BookshelfClient() {
         .from('book_group_tags')
         .select('group_tag')
         .eq('book_id', book.id)
-        .then(({ data }) => {
+        .then(({ data }: { data: { group_tag: string }[] | null }) => {
           setEditingBookGroupTags(
             (data ?? []).map((row: { group_tag: string }) => row.group_tag)
           )
