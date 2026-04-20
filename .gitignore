@@ -1,0 +1,61 @@
+# ============================================
+# 莲花书院 — 根目录 .gitignore
+# ============================================
+
+# ---- 操作系统 ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# ---- IDE / 编辑器 ----
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.claude/
+
+# ---- Kiro ----
+.kiro/
+
+# ---- 环境变量 / 密钥 ----
+.env
+.env.*
+!.env.example
+!.env.*.example
+!docker/.env.example
+!frontend/.env.local.example
+
+# ---- Node.js / 前端 ----
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnp
+.pnp.js
+.yarn/install-state.gz
+coverage/
+.vercel
+
+# ---- Docker ----
+docker/data/
+
+# ---- 日志 ----
+*.log
+logs/
+
+# ---- 临时文件 ----
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
