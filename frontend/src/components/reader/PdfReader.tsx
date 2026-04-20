@@ -51,6 +51,7 @@ export const HIGHLIGHT_COLORS = [
 ] as const
 
 const DEFAULT_COLOR = HIGHLIGHT_COLORS[0].value
+const COLOR_STORAGE_KEY = 'reader-highlight-color'
 
 /** 将数据库批注转换为 react-pdf-highlighter-extended 的 Highlight 格式 */
 interface ReaderHighlight extends Highlight {
@@ -86,8 +87,26 @@ export function PdfReader({
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
   const [scale, setScale] = useState<number>(1.0)
-  const [activeColor, setActiveColor] = useState<string>(DEFAULT_COLOR)
+  const [activeColor, setActiveColor] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(COLOR_STORAGE_KEY)
+      if (saved && HIGHLIGHT_COLORS.some((c) => c.value === saved)) {
+        return saved
+      }
+    }
+    return DEFAULT_COLOR
+  })
   const [notePanelOpen, setNotePanelOpen] = useState(false)
+
+  /** 切换颜色并持久化到 localStorage */
+  const handleColorChange = useCallback((color: string) => {
+    setActiveColor(color)
+    try {
+      localStorage.setItem(COLOR_STORAGE_KEY, color)
+    } catch {
+      // 静默处理 storage 不可用的情况
+    }
+  }, [])
   const [scrolledToHighlightId, setScrolledToHighlightId] = useState<
     string | null
   >(null)
@@ -269,7 +288,7 @@ export function PdfReader({
         onBack={onBack}
         onPageChange={handlePageChange}
         onScaleChange={handleScaleChange}
-        onColorChange={setActiveColor}
+        onColorChange={handleColorChange}
         onToggleNotePanel={() => setNotePanelOpen((prev) => !prev)}
       />
 

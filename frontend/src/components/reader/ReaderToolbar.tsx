@@ -137,7 +137,7 @@ export function ReaderToolbar({
 
   return (
     <div
-      className="flex h-12 shrink-0 items-center justify-between
+      className="relative z-[60] flex h-12 shrink-0 items-center justify-between
         border-b border-zinc-700/50 bg-zinc-900/95 backdrop-blur-sm px-2 sm:px-3 gap-1 sm:gap-2"
     >
       {/* 左侧：返回 + 标题 */}
@@ -243,6 +243,7 @@ export function ReaderToolbar({
         {canAnnotate && (
           <div className="relative" ref={colorPickerRef}>
             <button
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setColorPickerOpen((prev) => !prev)}
               className="flex h-8 w-8 items-center justify-center rounded-lg
                 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
@@ -272,6 +273,7 @@ export function ReaderToolbar({
                   {HIGHLIGHT_COLORS.map((color) => (
                     <button
                       key={color.value}
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={() => {
                         onColorChange(color.value)
                         setColorPickerOpen(false)
