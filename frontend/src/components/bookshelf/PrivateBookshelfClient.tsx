@@ -200,7 +200,7 @@ export function PrivateBookshelfClient() {
         author: '',
         description: '',
         cover_url: '',
-        published_date: '',
+        published_date: new Date().toISOString().split('T')[0],
       })
       setUploadStep('success')
 

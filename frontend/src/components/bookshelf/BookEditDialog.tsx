@@ -1,18 +1,27 @@
 'use client'
 
-import { useState, useCallback, type KeyboardEvent } from 'react'
+import { useState, useCallback, useRef, type KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, FloppyDisk, SpinnerGap, Tag, Plus } from '@phosphor-icons/react'
+import {
+  X,
+  FloppyDisk,
+  SpinnerGap,
+  Tag,
+  Plus,
+  UploadSimple,
+  Image as ImageIcon,
+  Trash,
+} from '@phosphor-icons/react'
+import { createClient } from '@/lib/supabase'
 import type { BookEditDialogProps } from '@/types/components'
 import type { BookMetadata } from '@/types/common'
 
 /**
  * BookEditDialog — 书籍信息编辑弹窗
  *
- * 模态覆盖层，包含封面 URL、标题、作者、发布日期、描述字段。
+ * 模态覆盖层，包含封面上传、标题、作者、发布日期、描述字段。
  * 公共书籍额外显示分组标签可见性设置区域。
- * 使用 Framer Motion Spring 物理动效实现入场/退场动画。
- * Glassmorphism 背景：backdrop-blur-xl + 半透明遮罩。
+ * 封面图片上传到 Supabase Storage 的 books bucket 下 covers/ 目录。
  */
 
 const springTransition = {
@@ -20,6 +29,10 @@ const springTransition = {
   stiffness: 100,
   damping: 20,
 }
+
+/** 允许的图片类型 */
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const MAX_COVER_SIZE = 5 * 1024 * 1024 // 5MB
 
 export function BookEditDialog({
   book,
@@ -36,9 +49,88 @@ export function BookEditDialog({
   const [description, setDescription] = useState(book.description ?? '')
   const [saving, setSaving] = useState(false)
   const [tagInput, setTagInput] = useState('')
+  const [coverUploading, setCoverUploading] = useState(false)
+  const [coverError, setCoverError] = useState('')
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
 
   const isPublicBook = book.type === 'public'
   const showGroupTags = isPublicBook && onGroupTagsChange !== undefined
+
+  /** 当前显示的封面：优先本地预览，其次已有 URL */
+  const displayCover = coverPreview || coverUrl
+
+  /**
+   * 上传封面图片到 Storage
+   */
+  const handleCoverSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+
+      // 重置 input 以便重复选择同一文件
+      if (coverInputRef.current) coverInputRef.current.value = ''
+
+      // 校验类型
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        setCoverError('仅支持 JPG、PNG、WebP、GIF 格式')
+        return
+      }
+
+      // 校验大小
+      if (file.size > MAX_COVER_SIZE) {
+        setCoverError('封面图片不能超过 5MB')
+        return
+      }
+
+      setCoverError('')
+      setCoverUploading(true)
+
+      // 本地预览
+      const localUrl = URL.createObjectURL(file)
+      setCoverPreview(localUrl)
+
+      try {
+        const ext = file.name.split('.').pop() || 'jpg'
+        const filePath = `covers/${book.id}_${Date.now()}.${ext}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('books')
+          .upload(filePath, file, {
+            contentType: file.type,
+            upsert: true,
+          })
+
+        if (uploadError) {
+          throw new Error(uploadError.message)
+        }
+
+        // 获取公开 URL
+        const { data: urlData } = supabase.storage
+          .from('books')
+          .getPublicUrl(filePath)
+
+        setCoverUrl(urlData.publicUrl)
+        setCoverError('')
+      } catch (err) {
+        setCoverError(err instanceof Error ? err.message : '封面上传失败')
+        setCoverPreview(null)
+      } finally {
+        setCoverUploading(false)
+      }
+    },
+    [supabase, book.id]
+  )
+
+  /** 移除封面 */
+  const handleRemoveCover = useCallback(() => {
+    if (coverPreview) URL.revokeObjectURL(coverPreview)
+    setCoverPreview(null)
+    setCoverUrl('')
+    setCoverError('')
+  }, [coverPreview])
 
   const handleSave = useCallback(async () => {
     if (!title.trim()) return
@@ -135,28 +227,117 @@ export function BookEditDialog({
 
             {/* Form */}
             <div className="flex flex-col gap-4 px-6 py-4">
-              {/* 封面 URL */}
+              {/* 封面上传 */}
               <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="edit-cover-url"
-                  className="text-sm font-medium text-[var(--color-text)]"
-                >
-                  封面 URL
+                <label className="text-sm font-medium text-[var(--color-text)]">
+                  封面图片
                 </label>
+
                 <input
-                  id="edit-cover-url"
-                  type="url"
-                  value={coverUrl}
-                  onChange={(e) => setCoverUrl(e.target.value)}
-                  placeholder="https://example.com/cover.jpg"
-                  disabled={saving}
-                  className="w-full rounded-lg border border-[var(--color-border)]
-                    bg-[var(--color-surface)] py-2 px-3 text-sm text-[var(--color-text)]
-                    placeholder:text-[var(--color-text-subtle)]
-                    outline-none transition-colors
-                    focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]/30
-                    disabled:cursor-not-allowed disabled:opacity-60"
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleCoverSelect}
+                  className="hidden"
+                  aria-hidden="true"
                 />
+
+                {displayCover ? (
+                  /* 封面预览 */
+                  <div className="relative group w-full">
+                    <div
+                      className="relative w-full rounded-lg overflow-hidden border
+                        border-[var(--color-border)] bg-[var(--color-border-subtle)]"
+                      style={{ aspectRatio: '3 / 4', maxHeight: '200px', width: 'auto', margin: '0 auto' }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={displayCover}
+                        alt="封面预览"
+                        className="w-full h-full object-cover"
+                      />
+                      {coverUploading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <motion.span
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                            className="text-white"
+                          >
+                            <SpinnerGap size={24} />
+                          </motion.span>
+                        </div>
+                      )}
+                    </div>
+                    {/* 操作按钮 */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => coverInputRef.current?.click()}
+                        disabled={saving || coverUploading}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5
+                          rounded-lg border border-[var(--color-border)]
+                          bg-[var(--color-surface)] py-1.5 px-3
+                          text-xs font-medium text-[var(--color-text-muted)]
+                          hover:text-[var(--color-text)] hover:border-[var(--color-accent)]
+                          transition-colors active:scale-[0.98]
+                          disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <UploadSimple size={14} weight="bold" />
+                        更换封面
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCover}
+                        disabled={saving || coverUploading}
+                        className="inline-flex items-center justify-center gap-1.5
+                          rounded-lg border border-[var(--color-border)]
+                          bg-[var(--color-surface)] py-1.5 px-3
+                          text-xs font-medium text-[var(--color-error)]
+                          hover:border-[var(--color-error)] transition-colors
+                          active:scale-[0.98]
+                          disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Trash size={14} weight="bold" />
+                        移除
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* 上传占位区域 */
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={saving || coverUploading}
+                    className="flex flex-col items-center justify-center gap-2
+                      w-full rounded-lg border-2 border-dashed border-[var(--color-border)]
+                      bg-[var(--color-border-subtle)]/30 py-8
+                      text-[var(--color-text-subtle)]
+                      hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]
+                      transition-colors cursor-pointer
+                      disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {coverUploading ? (
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <SpinnerGap size={24} />
+                      </motion.span>
+                    ) : (
+                      <ImageIcon size={24} weight="duotone" />
+                    )}
+                    <span className="text-xs font-medium">
+                      {coverUploading ? '上传中...' : '点击上传封面图片'}
+                    </span>
+                    <span className="text-[10px] text-[var(--color-text-subtle)]">
+                      支持 JPG、PNG、WebP、GIF，最大 5MB
+                    </span>
+                  </button>
+                )}
+
+                {coverError && (
+                  <p className="text-xs text-[var(--color-error)]">{coverError}</p>
+                )}
               </div>
 
               {/* 标题 */}
@@ -350,7 +531,7 @@ export function BookEditDialog({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !title.trim()}
+                disabled={saving || coverUploading || !title.trim()}
                 className="inline-flex items-center gap-2 rounded-lg
                   bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white
                   transition-colors hover:bg-[var(--color-accent-hover)]

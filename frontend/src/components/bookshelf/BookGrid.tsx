@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { BookOpen, ImageBroken, PencilSimple } from '@phosphor-icons/react'
+import { BookOpen, PencilSimple } from '@phosphor-icons/react'
 import type { BookGridProps } from '@/types/components'
 import type { Book } from '@/types/database'
 
@@ -86,6 +86,57 @@ function BookGridEmpty() {
   )
 }
 
+/** 根据字符串生成稳定的柔和色调 */
+function titleToHue(title: string): number {
+  let hash = 0
+  for (let i = 0; i < title.length; i++) {
+    hash = title.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return Math.abs(hash) % 360
+}
+
+/** 文字封面：根据标题生成带颜色的封面 */
+function TextCover({ title, author }: { title: string; author?: string | null }) {
+  const hue = titleToHue(title)
+  // 柔和的渐变背景
+  const bg = `linear-gradient(135deg, hsl(${hue}, 35%, 88%) 0%, hsl(${(hue + 30) % 360}, 30%, 78%) 100%)`
+  const accentColor = `hsl(${hue}, 40%, 35%)`
+
+  return (
+    <div
+      className="flex h-full w-full flex-col items-center justify-center p-4 select-none"
+      style={{ background: bg }}
+    >
+      {/* 装饰线 */}
+      <div
+        className="w-8 h-0.5 rounded-full mb-4 opacity-40"
+        style={{ backgroundColor: accentColor }}
+      />
+      {/* 标题 */}
+      <h4
+        className="text-center font-semibold leading-snug line-clamp-4 px-2"
+        style={{ color: accentColor, fontSize: title.length > 10 ? '0.8rem' : '0.9rem' }}
+      >
+        {title}
+      </h4>
+      {/* 作者 */}
+      {author && (
+        <p
+          className="mt-2 text-center text-[0.65rem] leading-tight line-clamp-1 opacity-60 px-2"
+          style={{ color: accentColor }}
+        >
+          {author}
+        </p>
+      )}
+      {/* 装饰线 */}
+      <div
+        className="w-8 h-0.5 rounded-full mt-4 opacity-40"
+        style={{ backgroundColor: accentColor }}
+      />
+    </div>
+  )
+}
+
 /** Single book card */
 function BookCard({
   book,
@@ -119,12 +170,7 @@ function BookCard({
               loading="lazy"
             />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[var(--color-border-subtle)]">
-              <ImageBroken size={32} weight="duotone" className="text-[var(--color-text-subtle)]" />
-              <span className="text-xs text-[var(--color-text-subtle)] px-2 text-center leading-tight line-clamp-2">
-                {book.title}
-              </span>
-            </div>
+            <TextCover title={book.title} author={book.author} />
           )}
         </div>
 

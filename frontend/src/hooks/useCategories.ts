@@ -86,11 +86,17 @@ export function useCategories(shelfType: ShelfType): UseCategoriesReturn {
         ? Math.max(...categories.map((c) => c.sort_order))
         : -1
 
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('栏目创建失败: 用户未登录')
+      }
+
       const { data, error } = await supabase
         .from('categories')
         .insert({
           name,
           shelf_type: shelfType,
+          owner_id: user.id,
           sort_order: maxSortOrder + 1,
         })
         .select()
