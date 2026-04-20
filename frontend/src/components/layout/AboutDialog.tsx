@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BookOpenText, X } from '@phosphor-icons/react'
 
@@ -63,11 +64,11 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
     }
   }, [open, handleKeyDown])
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center px-4"
           variants={overlayVariants}
           initial="hidden"
           animate="visible"
@@ -207,6 +208,7 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MagnifyingGlass,
@@ -11,6 +12,9 @@ import {
   Check,
   WarningCircle,
   UsersThree,
+  X,
+  Calendar,
+  IdentificationBadge,
 } from '@phosphor-icons/react'
 import { useUserManagement } from '@/hooks/useUserManagement'
 import { useAuthContext } from '@/components/providers/AuthProvider'
@@ -44,6 +48,7 @@ export function AdminClient() {
   const [editingTagsUserId, setEditingTagsUserId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null)
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null)
 
   /** 搜索处理 */
   const handleSearch = useCallback(
@@ -202,10 +207,17 @@ export function AdminClient() {
                 )
               }
               onTagsUpdate={handleTagsUpdate}
+              onAvatarClick={() => setSelectedUser(u)}
             />
           ))}
         </motion.div>
       )}
+
+      {/* User detail dialog */}
+      <UserDetailDialog
+        user={selectedUser}
+        onClose={() => setSelectedUser(null)}
+      />
     </div>
   )
 }
@@ -251,6 +263,7 @@ interface UserRowProps {
   onRoleToggle: (userId: string, currentRole: 'admin' | 'user') => void
   onEditTags: () => void
   onTagsUpdate: (userId: string, tags: string[]) => void
+  onAvatarClick: () => void
 }
 
 function UserRow({
@@ -261,6 +274,7 @@ function UserRow({
   onRoleToggle,
   onEditTags,
   onTagsUpdate,
+  onAvatarClick,
 }: UserRowProps) {
   const initial = (user.nickname || user.id || '?').charAt(0).toUpperCase()
 
@@ -276,9 +290,14 @@ function UserRow({
     >
       <div className="flex items-center gap-4 px-4 py-3">
         {/* Avatar */}
-        <div
+        <button
+          type="button"
+          onClick={onAvatarClick}
           className="h-10 w-10 shrink-0 rounded-full overflow-hidden
-            bg-[var(--color-accent-muted)] flex items-center justify-center"
+            bg-[var(--color-accent-muted)] flex items-center justify-center
+            ring-2 ring-transparent hover:ring-[var(--color-accent)]/40
+            transition-all cursor-pointer active:scale-95"
+          aria-label={`查看 ${user.nickname || '用户'} 的详情`}
         >
           {user.avatar_url ? (
             <img
@@ -291,7 +310,7 @@ function UserRow({
               {initial}
             </span>
           )}
-        </div>
+        </button>
 
         {/* User info */}
         <div className="min-w-0 flex-1">
@@ -544,6 +563,197 @@ function GroupTagEditor({
             '添加'
           )}
         </button>
+      </div>
+    </div>
+  )
+}
+
+/* ─── UserDetailDialog ─── */
+
+function UserDetailDialog({
+  user,
+  onClose,
+}: {
+  user: UserProfile | null
+  onClose: () => void
+}) {
+  if (!user) return null
+
+  const initial = (user.nickname || user.id || '?').charAt(0).toUpperCase()
+  const createdAt = new Date(user.created_at).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+  const updatedAt = new Date(user.updated_at).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+      >
+        {/* Backdrop */}
+        <motion.div
+          className="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+
+        {/* Panel */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="用户详情"
+          className="relative w-full max-w-sm overflow-hidden rounded-2xl
+            bg-[var(--color-surface)]/80 backdrop-blur-xl
+            border border-white/10
+            shadow-[0_20px_60px_-12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.1)]"
+        >
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center
+              rounded-lg text-[var(--color-text-subtle)]
+              hover:text-[var(--color-text-muted)] hover:bg-[var(--color-border-subtle)]
+              transition-colors active:scale-[0.98]"
+            aria-label="关闭"
+          >
+            <X size={16} weight="bold" />
+          </button>
+
+          {/* Content */}
+          <div className="flex flex-col items-center px-8 pt-10 pb-8">
+            {/* Avatar */}
+            <div
+              className="h-20 w-20 rounded-full overflow-hidden
+                bg-[var(--color-accent-muted)] flex items-center justify-center
+                ring-4 ring-[var(--color-accent)]/20"
+            >
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.nickname || '用户头像'}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-2xl font-semibold text-[var(--color-accent)]">
+                  {initial}
+                </span>
+              )}
+            </div>
+
+            {/* Nickname */}
+            <h3 className="mt-4 text-lg font-semibold text-[var(--color-text)]">
+              {user.nickname || '未设置昵称'}
+            </h3>
+
+            {/* Role badge */}
+            <span
+              className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                user.role === 'admin'
+                  ? 'bg-[var(--color-accent-muted)] text-[var(--color-accent)]'
+                  : 'bg-[var(--color-border-subtle)] text-[var(--color-text-muted)]'
+              }`}
+            >
+              {user.role === 'admin' ? (
+                <ShieldCheck size={12} weight="bold" />
+              ) : (
+                <UserIcon size={12} weight="regular" />
+              )}
+              {user.role === 'admin' ? '管理员' : '普通用户'}
+            </span>
+
+            {/* Bio */}
+            {user.bio && (
+              <p className="mt-4 text-center text-sm text-[var(--color-text-muted)] leading-relaxed max-w-[28ch]">
+                {user.bio}
+              </p>
+            )}
+
+            {/* Divider */}
+            <div className="mt-5 h-px w-full bg-[var(--color-border-subtle)]" />
+
+            {/* Detail fields */}
+            <div className="mt-5 w-full space-y-3">
+              <DetailRow
+                icon={<IdentificationBadge size={15} weight="regular" />}
+                label="用户 ID"
+                value={user.id}
+                mono
+              />
+              <DetailRow
+                icon={<Calendar size={15} weight="regular" />}
+                label="注册时间"
+                value={createdAt}
+              />
+              <DetailRow
+                icon={<Calendar size={15} weight="regular" />}
+                label="最近更新"
+                value={updatedAt}
+              />
+              {user.group_tags.length > 0 && (
+                <div className="flex items-start gap-2.5">
+                  <Tag size={15} weight="regular" className="text-[var(--color-text-subtle)] mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs text-[var(--color-text-subtle)]">分组标签</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {user.group_tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-[var(--color-bg)] border border-[var(--color-border)]
+                            px-2 py-0.5 text-xs text-[var(--color-text)]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
+    document.body
+  )
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+  mono,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  mono?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="text-[var(--color-text-subtle)] shrink-0">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-[var(--color-text-subtle)]">{label}</p>
+        <p
+          className={`text-sm text-[var(--color-text)] truncate ${
+            mono ? 'font-mono text-xs' : ''
+          }`}
+        >
+          {value}
+        </p>
       </div>
     </div>
   )

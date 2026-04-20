@@ -9,6 +9,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "莲花书院",
   description: "莲花书院 — 全中文书城社区",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
