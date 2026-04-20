@@ -12,6 +12,7 @@ import {
   Check,
   WarningCircle,
   ArrowLeft,
+  Envelope,
 } from '@phosphor-icons/react'
 import { useAuthContext } from '@/components/providers/AuthProvider'
 import { createClient } from '@/lib/supabase'
@@ -72,6 +73,12 @@ export default function ProfilePage() {
   const [savingPassword, setSavingPassword] = useState(false)
   const [passwordFeedback, setPasswordFeedback] = useState<FeedbackMessage | null>(null)
 
+  // Email state
+  const [currentEmail, setCurrentEmail] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [savingEmail, setSavingEmail] = useState(false)
+  const [emailFeedback, setEmailFeedback] = useState<FeedbackMessage | null>(null)
+
   // Initialize form with user data once loaded
   useEffect(() => {
     if (user && !profileInitialized) {
@@ -81,8 +88,17 @@ export default function ProfilePage() {
       })
       setAvatarPreview(user.avatar_url || null)
       setProfileInitialized(true)
+
+      // Fetch email from auth
+      void (async () => {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser?.email) {
+          setCurrentEmail(authUser.email)
+          setNewEmail(authUser.email)
+        }
+      })()
     }
-  }, [user, profileInitialized])
+  }, [user, profileInitialized, supabase])
 
   // Redirect if not logged in
   useEffect(() => {
@@ -260,6 +276,52 @@ export default function ProfilePage() {
       }
     },
     [validatePassword, passwordForm, supabase, signOut, router]
+  )
+
+  /** 修改邮箱 */
+  const handleChangeEmail = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+
+      const trimmedEmail = newEmail.trim()
+      if (!trimmedEmail) {
+        setEmailFeedback({ type: 'error', text: '请输入邮箱地址' })
+        return
+      }
+      if (trimmedEmail === currentEmail) {
+        setEmailFeedback({ type: 'error', text: '新邮箱与当前邮箱相同' })
+        setTimeout(() => setEmailFeedback(null), 3000)
+        return
+      }
+
+      setSavingEmail(true)
+      setEmailFeedback(null)
+
+      try {
+        const { error } = await supabase.auth.updateUser({
+          email: trimmedEmail,
+        })
+
+        if (error) {
+          throw new Error(error.message)
+        }
+
+        setCurrentEmail(trimmedEmail)
+        setEmailFeedback({
+          type: 'success',
+          text: '邮箱修改成功',
+        })
+        setTimeout(() => setEmailFeedback(null), 3000)
+      } catch (err) {
+        setEmailFeedback({
+          type: 'error',
+          text: err instanceof Error ? err.message : '邮箱修改失败，请重试',
+        })
+      } finally {
+        setSavingEmail(false)
+      }
+    },
+    [newEmail, currentEmail, supabase]
   )
 
   // Loading state
@@ -506,6 +568,112 @@ export default function ProfilePage() {
                 </motion.button>
               </div>
             </div>
+          </motion.section>
+
+          {/* Divider */}
+          <div className="h-px bg-[var(--color-border-subtle)]" />
+
+          {/* Email section */}
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...springTransition, delay: 0.12 }}
+          >
+            <h2 className="text-lg font-semibold tracking-tight text-[var(--color-text)] mb-5">
+              邮箱地址
+            </h2>
+
+            {/* Email feedback */}
+            <AnimatePresence>
+              {emailFeedback && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={springTransition}
+                  className="mb-4 overflow-hidden"
+                >
+                  <div
+                    className={`flex items-center gap-2 rounded-lg border px-4 py-3 ${
+                      emailFeedback.type === 'success'
+                        ? 'border-[var(--color-accent)]/20 bg-[var(--color-accent-muted)]'
+                        : 'border-[var(--color-error)]/20 bg-[var(--color-error-muted)]'
+                    }`}
+                  >
+                    {emailFeedback.type === 'success' ? (
+                      <Check size={16} weight="bold" className="text-[var(--color-accent)] shrink-0" />
+                    ) : (
+                      <WarningCircle size={16} weight="bold" className="text-[var(--color-error)] shrink-0" />
+                    )}
+                    <p
+                      className={`text-sm ${
+                        emailFeedback.type === 'success'
+                          ? 'text-[var(--color-text)]'
+                          : 'text-[var(--color-error)]'
+                      }`}
+                    >
+                      {emailFeedback.text}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleChangeEmail} className="flex flex-col gap-5 max-w-lg">
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="email"
+                  className="text-sm font-medium text-[var(--color-text)]"
+                >
+                  邮箱
+                </label>
+                <div className="relative">
+                  <Envelope
+                    size={18}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-subtle)]"
+                  />
+                  <input
+                    id="email"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="w-full rounded-lg border border-[var(--color-border)]
+                      bg-[var(--color-surface)] py-2.5 pl-10 pr-4
+                      text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]
+                      outline-none transition-colors
+                      focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <motion.button
+                  type="submit"
+                  disabled={savingEmail || newEmail.trim() === currentEmail}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex items-center gap-2 rounded-lg
+                    border border-[var(--color-border)] bg-[var(--color-surface)]
+                    px-4 py-2.5 text-sm font-medium text-[var(--color-text)]
+                    transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]
+                    disabled:cursor-not-allowed disabled:opacity-60
+                    active:scale-[0.98]"
+                >
+                  {savingEmail ? (
+                    <motion.span
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                      className="inline-flex"
+                    >
+                      <SpinnerGap size={16} />
+                    </motion.span>
+                  ) : (
+                    <Envelope size={16} weight="bold" />
+                  )}
+                  <span>修改邮箱</span>
+                </motion.button>
+              </div>
+            </form>
           </motion.section>
 
           {/* Divider */}
