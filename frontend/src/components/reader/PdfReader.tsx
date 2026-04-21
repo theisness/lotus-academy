@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import React from 'react'
-import { version as pdfjsVersion, GlobalWorkerOptions } from 'pdfjs-dist'
+import { GlobalWorkerOptions } from 'pdfjs-dist'
 import {
   PdfLoader,
   PdfHighlighter,
@@ -28,7 +28,8 @@ import { HighlightPopup } from './HighlightPopup'
 import 'react-pdf-highlighter-extended/dist/esm/style/TextHighlight.css'
 import 'react-pdf-highlighter-extended/dist/esm/style/PdfHighlighter.css'
 
-GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.mjs`
+// 使用本地 worker 文件，避免从 unpkg.com 下载
+GlobalWorkerOptions.workerSrc = '/pdf-worker/pdf.worker.min.mjs'
 
 /**
  * PdfReader — PDF 阅读器核心组件
@@ -97,6 +98,7 @@ export function PdfReader({
     return DEFAULT_COLOR
   })
   const [notePanelOpen, setNotePanelOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   /** 切换颜色并持久化到 localStorage */
   const handleColorChange = useCallback((color: string) => {
@@ -296,10 +298,10 @@ export function PdfReader({
       <div className="relative flex flex-1 overflow-hidden">
         {/* PDF 阅读器 */}
         <div className="relative flex-1 overflow-auto">
-          <PdfLoader
-            document={fileUrl}
-            beforeLoad={() => (
-              <div className="flex h-full items-center justify-center">
+          {/* 加载指示器 - 始终显示直到 PDF 加载完成 */}
+          {isLoading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-900">
+              <div className="flex flex-col items-center gap-4">
                 <motion.span
                   animate={{ rotate: 360 }}
                   transition={{
@@ -309,25 +311,55 @@ export function PdfReader({
                   }}
                   className="inline-flex text-[var(--color-accent)]"
                 >
-                  <SpinnerGap size={32} />
+                  <SpinnerGap size={40} />
                 </motion.span>
+                <p className="text-sm text-zinc-400">正在加载 PDF...</p>
               </div>
-            )}
-            errorMessage={() => (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <WarningCircle
-                  size={32}
-                  weight="duotone"
-                  className="text-zinc-400"
-                />
-                <p className="text-sm text-zinc-400">PDF 文件加载失败</p>
-              </div>
-            )}
+            </div>
+          )}
+          
+          <PdfLoader
+            document={fileUrl}
+            workerSrc="/pdf-worker/pdf.worker.min.mjs"
+            beforeLoad={() => {
+              setIsLoading(true)
+              return (
+                <div className="flex h-full items-center justify-center">
+                  <motion.span
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 0.8,
+                      repeat: Infinity,
+                      ease: 'linear',
+                    }}
+                    className="inline-flex text-[var(--color-accent)]"
+                  >
+                    <SpinnerGap size={32} />
+                  </motion.span>
+                </div>
+              )
+            }}
+            errorMessage={(error) => {
+              console.error('[PdfReader] Load error:', error)
+              setIsLoading(false)
+              return (
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                  <WarningCircle
+                    size={32}
+                    weight="duotone"
+                    className="text-zinc-400"
+                  />
+                  <p className="text-sm text-zinc-400">PDF 文件加载失败</p>
+                  <p className="text-xs text-zinc-500">{String(error)}</p>
+                </div>
+              )
+            }}
           >
             {(pdfDocument) => (
                 <PdfHighlighterWithPages
                   pdfDocument={pdfDocument}
                   onTotalPages={setTotalPages}
+                  onLoadComplete={() => setIsLoading(false)}
                   highlights={highlights}
                   pdfScaleValue={scale}
                   onSelection={canAnnotate ? handleSelection : undefined}
@@ -373,14 +405,20 @@ export function PdfReader({
 function PdfHighlighterWithPages({
   pdfDocument,
   onTotalPages,
+  onLoadComplete,
   children,
   ...props
 }: Omit<React.ComponentProps<typeof PdfHighlighter>, 'style'> & {
   onTotalPages: (n: number) => void
+  onLoadComplete?: () => void
 }) {
   useEffect(() => {
     onTotalPages(pdfDocument.numPages)
-  }, [pdfDocument, onTotalPages])
+    // PDF 文档已加载，通知父组件
+    if (onLoadComplete) {
+      onLoadComplete()
+    }
+  }, [pdfDocument, onTotalPages, onLoadComplete])
 
   return (
     <PdfHighlighter

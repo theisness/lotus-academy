@@ -1,10 +1,26 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import localFont from "next/font/local";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Navbar } from "@/components/layout/Navbar";
 import { PageTransition } from "@/components/layout/PageTransition";
 import "./globals.css";
+
+// 使用本地字体文件，避免网络请求
+const GeistSans = localFont({
+  src: [
+    { path: "./fonts/GeistVF.woff", style: "normal", weight: "100 900" },
+  ],
+  variable: "--font-geist-sans",
+  display: "swap",
+});
+
+const GeistMono = localFont({
+  src: [
+    { path: "./fonts/GeistMonoVF.woff", style: "normal", weight: "100 900" },
+  ],
+  variable: "--font-geist-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "莲花书院",

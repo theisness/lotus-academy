@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { BookOpen, PencilSimple } from '@phosphor-icons/react'
+import { BookOpen, PencilSimple, Info } from '@phosphor-icons/react'
 import type { BookGridProps } from '@/types/components'
 import type { Book } from '@/types/database'
 
@@ -142,10 +142,12 @@ function BookCard({
   book,
   onClick,
   onEditClick,
+  onInfoClick,
 }: {
   book: Book
   onClick: (book: Book) => void
   onEditClick?: (book: Book) => void
+  onInfoClick?: (book: Book) => void
 }) {
   return (
     <motion.div
@@ -188,34 +190,58 @@ function BookCard({
         </div>
       </button>
 
-      {/* Edit button — appears on hover, top-right of cover */}
-      {onEditClick && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onEditClick(book)
-          }}
-          className="absolute top-2 right-2 z-10
-            flex h-8 w-8 items-center justify-center rounded-lg
-            bg-[var(--color-surface)]/80 backdrop-blur-sm
-            border border-[var(--color-border)]
-            text-[var(--color-text-muted)]
-            opacity-0 group-hover:opacity-100
-            transition-all duration-200
-            hover:bg-[var(--color-surface)] hover:text-[var(--color-accent)]
-            active:scale-[0.98]
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-          aria-label="编辑书籍信息"
-        >
-          <PencilSimple size={16} weight="bold" />
-        </button>
-      )}
+      {/* Action buttons — appear on hover, top-right of cover */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1.5
+        opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        {/* Info button — for non-admin users */}
+        {onInfoClick && !onEditClick && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onInfoClick(book)
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg
+              bg-[var(--color-surface)]/80 backdrop-blur-sm
+              border border-[var(--color-border)]
+              text-[var(--color-text-muted)]
+              transition-all duration-200
+              hover:bg-[var(--color-surface)] hover:text-[var(--color-accent)]
+              active:scale-[0.98]
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+            aria-label="查看书籍详情"
+          >
+            <Info size={16} weight="bold" />
+          </button>
+        )}
+        
+        {/* Edit button — for admin users */}
+        {onEditClick && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEditClick(book)
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg
+              bg-[var(--color-surface)]/80 backdrop-blur-sm
+              border border-[var(--color-border)]
+              text-[var(--color-text-muted)]
+              transition-all duration-200
+              hover:bg-[var(--color-surface)] hover:text-[var(--color-accent)]
+              active:scale-[0.98]
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+            aria-label="编辑书籍信息"
+          >
+            <PencilSimple size={16} weight="bold" />
+          </button>
+        )}
+      </div>
     </motion.div>
   )
 }
 
-export function BookGrid({ books, columns, loading, onBookClick, onEditClick }: BookGridProps) {
+export function BookGrid({ books, columns, loading, onBookClick, onEditClick, onInfoClick }: BookGridProps) {
   if (loading) {
     return <BookGridSkeleton columns={columns} />
   }
@@ -238,6 +264,7 @@ export function BookGrid({ books, columns, loading, onBookClick, onEditClick }: 
           book={book}
           onClick={onBookClick}
           onEditClick={onEditClick}
+          onInfoClick={onInfoClick}
         />
       ))}
     </motion.div>

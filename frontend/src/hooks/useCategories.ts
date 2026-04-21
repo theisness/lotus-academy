@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase'
 import type { Category, ShelfType } from '@/types/database'
 import type { UseCategoriesReturn } from '@/types/hooks'
 
+// 在模块级别获取单例客户端，避免每次渲染创建新实例
+const supabase = createClient()
+
 /**
  * useCategories Hook — 栏目管理
  *
@@ -20,13 +23,12 @@ export function useCategories(shelfType: ShelfType): UseCategoriesReturn {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
 
-  const supabase = createClient()
-
   /**
    * 从数据库获取栏目列表
    * 根据 shelfType 过滤书架类型，按 sort_order 排序
    */
   const fetchCategories = useCallback(async () => {
+    console.log('[useCategories] fetchCategories started, shelfType:', shelfType)
     setLoading(true)
 
     try {
@@ -36,6 +38,8 @@ export function useCategories(shelfType: ShelfType): UseCategoriesReturn {
         .eq('shelf_type', shelfType)
         .order('sort_order', { ascending: true })
 
+      console.log('[useCategories] Query result:', { dataLength: data?.length, error: error?.message })
+
       if (error) {
         // JWT 签名无效或 401 未授权时，清除无效会话后重试
         const isAuthError = error.message?.includes('JWS')
@@ -44,7 +48,12 @@ export function useCategories(shelfType: ShelfType): UseCategoriesReturn {
           || error.code === 'PGRST301'
           || (error as unknown as { status?: number }).status === 401
         if (isAuthError) {
-          await supabase.auth.signOut()
+          try {
+            await supabase.auth.signOut()
+          } catch {
+            // 忽略 signOut 错误
+          }
+          
           const { data: retryData, error: retryError } = await supabase
             .from('categories')
             .select('*')
@@ -52,9 +61,19 @@ export function useCategories(shelfType: ShelfType): UseCategoriesReturn {
             .order('sort_order', { ascending: true })
 
           if (retryError) {
+            // 对于公共书架，返回空数组
+            if (shelfType === 'public') {
+              setCategories([])
+              return
+            }
             throw new Error(retryError.message)
           }
           setCategories((retryData as Category[]) ?? [])
+          return
+        }
+        // 对于公共书架，返回空数组
+        if (shelfType === 'public') {
+          setCategories([])
           return
         }
         throw new Error(error.message)
@@ -63,6 +82,7 @@ export function useCategories(shelfType: ShelfType): UseCategoriesReturn {
       setCategories((data as Category[]) ?? [])
     } catch {
       // RLS 会自动过滤无权限的栏目，静默处理错误
+      // 对于公共书架，返回空数组而不是崩溃
       setCategories([])
     } finally {
       setLoading(false)

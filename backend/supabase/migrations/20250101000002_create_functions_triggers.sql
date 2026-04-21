@@ -34,6 +34,7 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================================
 -- 2. is_book_visible() — 判断书籍对指定用户是否可见
 --    - 私有书籍：仅上传者可见
+--    - 公共书籍：管理员始终可见
 --    - 公共书籍无分组标签：所有人可见（含未登录访客）
 --    - 公共书籍有分组标签：仅匹配标签的已登录用户可见
 -- ============================================================
@@ -44,10 +45,22 @@ DECLARE
   tag_count INT;
   match_count INT;
   viewer_tags TEXT[];
+  viewer_role TEXT;
 BEGIN
   -- 私有书籍：仅所有者可见
   IF book_row.type = 'private' THEN
     RETURN book_row.uploader_id = viewer_id;
+  END IF;
+
+  -- 公共书籍：管理员始终可见
+  IF viewer_id IS NOT NULL THEN
+    SELECT role INTO viewer_role
+    FROM profiles
+    WHERE id = viewer_id;
+    
+    IF viewer_role = 'admin' THEN
+      RETURN TRUE;
+    END IF;
   END IF;
 
   -- 公共书籍：检查分组标签

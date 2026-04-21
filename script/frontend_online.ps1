@@ -126,7 +126,7 @@ systemctl restart lotus-frontend
 echo 'Service restarted'
 '@
 
-ssh -p $SSH_PORT $SSH_HOST $SERVICE_SCRIPT
+# ssh -p $SSH_PORT $SSH_HOST $SERVICE_SCRIPT
 
 # Cleanup
 Remove-Item $TEMP_TAR -ErrorAction SilentlyContinue

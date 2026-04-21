@@ -36,21 +36,20 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 刷新用户会话 — 必须使用 getUser() 而非 getSession()
-  // getUser() 会向 Supabase Auth 服务器验证令牌，确保会话有效
-  const { data: { user }, error } = await supabase.auth.getUser()
-
-  // 仅当存在无效会话时才清除（如 JWSError JWSInvalidSignature）
-  // 对于完全未登录的用户（无 session），不应调用 signOut()，
-  // 否则会设置干扰性 Cookie 导致客户端 Supabase 请求丢失 apikey 头
-  if (error && !user) {
-    // 检查是否真的有残留的 session cookie 需要清理
-    const sessionCookie = request.cookies.getAll().find(
-      (c) => c.name.includes('auth-token')
-    )
-    if (sessionCookie) {
-      await supabase.auth.signOut()
-    }
+  // 重要：必须调用 getUser() 来刷新会话
+  // 添加超时保护，避免后端不可达时阻塞页面加载
+  try {
+    const getUserPromise = supabase.auth.getUser()
+    
+    // 3秒超时保护
+    const timeoutPromise = new Promise<null>((_, reject) => {
+      setTimeout(() => reject(new Error('getUser timeout')), 3000)
+    })
+    
+    await Promise.race([getUserPromise, timeoutPromise])
+  } catch (error) {
+    // 记录错误但不阻止请求
+    console.error('Middleware getUser error:', error)
   }
 
   return supabaseResponse

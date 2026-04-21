@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, type KeyboardEvent } from 'react'
+import { useState, useCallback, useRef, useEffect, type KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
@@ -52,9 +52,27 @@ export function BookEditDialog({
   const [coverUploading, setCoverUploading] = useState(false)
   const [coverError, setCoverError] = useState('')
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false)
 
   const coverInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
+
+  // 当 book 改变时重置状态
+  useEffect(() => {
+    if (open) {
+      setCoverUrl(book.cover_url ?? '')
+      setTitle(book.title)
+      setAuthor(book.author ?? '')
+      setPublishedDate(book.published_date ?? '')
+      setDescription(book.description ?? '')
+      setCoverPreview(null)
+      setCoverError('')
+      setTagInput('')
+      setTagSuggestions([])
+      setShowTagSuggestions(false)
+    }
+  }, [book, open])
 
   const isPublicBook = book.type === 'public'
   const showGroupTags = isPublicBook && onGroupTagsChange !== undefined
@@ -144,7 +162,13 @@ export function BookEditDialog({
         published_date: publishedDate.trim(),
         description: description.trim(),
       }
+      console.log('[BookEditDialog] Calling onSave with:', data)
       await onSave(data)
+      console.log('[BookEditDialog] onSave completed')
+    } catch (error) {
+      console.error('[BookEditDialog] Save error:', error)
+      // 保持对话框打开，让用户可以重试
+      // 可以考虑显示错误提示
     } finally {
       setSaving(false)
     }
@@ -177,6 +201,52 @@ export function BookEditDialog({
       }
     },
     [handleAddTag]
+  )
+
+  // Fetch tag suggestions based on input
+  const handleTagInputChange = useCallback(
+    async (value: string) => {
+      setTagInput(value)
+      
+      if (!value.trim()) {
+        setTagSuggestions([])
+        setShowTagSuggestions(false)
+        return
+      }
+
+      // Search for existing group tags
+      const { data } = await supabase
+        .from('book_group_tags')
+        .select('group_tag')
+        .ilike('group_tag', `%${value.trim()}%`)
+        .limit(5)
+
+      if (data && data.length > 0) {
+        // Get unique tags
+        const uniqueTags = [...new Set(data.map((row: { group_tag: string }) => row.group_tag))] as string[]
+        // Filter out already selected tags
+        const filtered = uniqueTags.filter((tag) => !groupTags?.includes(tag))
+        setTagSuggestions(filtered)
+        setShowTagSuggestions(filtered.length > 0)
+      } else {
+        setTagSuggestions([])
+        setShowTagSuggestions(false)
+      }
+    },
+    [supabase, groupTags]
+  )
+
+  const handleSelectTagSuggestion = useCallback(
+    (tag: string) => {
+      if (!groupTags || !onGroupTagsChange) return
+      if (!groupTags.includes(tag)) {
+        onGroupTagsChange([...groupTags, tag])
+      }
+      setTagInput('')
+      setTagSuggestions([])
+      setShowTagSuggestions(false)
+    },
+    [groupTags, onGroupTagsChange]
   )
 
   return (
@@ -482,32 +552,56 @@ export function BookEditDialog({
                   )}
 
                   {/* Add tag input */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={handleTagInputKeyDown}
-                      placeholder="输入分组标签名称，按回车添加"
-                      className="flex-1 rounded-lg border border-[var(--color-border)]
-                        bg-[var(--color-surface)] py-1.5 px-3 text-sm text-[var(--color-text)]
-                        placeholder:text-[var(--color-text-subtle)]
-                        outline-none transition-colors
-                        focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddTag}
-                      disabled={!tagInput.trim()}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg
-                        border border-[var(--color-border)] bg-[var(--color-surface)]
-                        text-[var(--color-text-muted)] hover:text-[var(--color-accent)]
-                        hover:border-[var(--color-accent)] transition-colors active:scale-[0.98]
-                        disabled:cursor-not-allowed disabled:opacity-60"
-                      aria-label="添加标签"
-                    >
-                      <Plus size={14} weight="bold" />
-                    </button>
+                  <div className="relative">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => handleTagInputChange(e.target.value)}
+                        onKeyDown={handleTagInputKeyDown}
+                        onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
+                        onFocus={() => tagSuggestions.length > 0 && setShowTagSuggestions(true)}
+                        placeholder="输入分组标签名称，按回车添加"
+                        className="flex-1 rounded-lg border border-[var(--color-border)]
+                          bg-[var(--color-surface)] py-1.5 px-3 text-sm text-[var(--color-text)]
+                          placeholder:text-[var(--color-text-subtle)]
+                          outline-none transition-colors
+                          focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddTag}
+                        disabled={!tagInput.trim()}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg
+                          border border-[var(--color-border)] bg-[var(--color-surface)]
+                          text-[var(--color-text-muted)] hover:text-[var(--color-accent)]
+                          hover:border-[var(--color-accent)] transition-colors active:scale-[0.98]
+                          disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-label="添加标签"
+                      >
+                        <Plus size={14} weight="bold" />
+                      </button>
+                    </div>
+
+                    {/* Tag suggestions dropdown */}
+                    {showTagSuggestions && tagSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-12 mt-1 z-10
+                        rounded-lg border border-[var(--color-border)]
+                        bg-[var(--color-surface)] shadow-lg overflow-hidden">
+                        {tagSuggestions.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => handleSelectTagSuggestion(tag)}
+                            className="w-full px-3 py-2 text-left text-sm text-[var(--color-text)]
+                              hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)]
+                              transition-colors"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

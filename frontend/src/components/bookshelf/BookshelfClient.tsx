@@ -23,6 +23,7 @@ import { DisplaySettings } from './DisplaySettings'
 import { BookGrid } from './BookGrid'
 import { BookUploadButton } from './BookUploadButton'
 import { BookEditDialog } from './BookEditDialog'
+import { BookInfoDialog } from './BookInfoDialog'
 import { CategoryManager } from './CategoryManager'
 
 /**
@@ -84,6 +85,9 @@ export function BookshelfClient() {
   // Edit dialog state
   const [editingBook, setEditingBook] = useState<Book | null>(null)
   const [editingBookGroupTags, setEditingBookGroupTags] = useState<string[]>([])
+
+  // Info dialog state (for non-admin users)
+  const [infoBook, setInfoBook] = useState<Book | null>(null)
 
   const supabase = createClient()
 
@@ -170,8 +174,17 @@ export function BookshelfClient() {
   const handleEditSave = useCallback(
     async (data: Partial<BookMetadata>) => {
       if (!editingBook) return
-      await updateBook(editingBook.id, data)
-      setEditingBook(null)
+      
+      try {
+        console.log('[BookEdit] Saving book:', editingBook.id, data)
+        await updateBook(editingBook.id, data)
+        console.log('[BookEdit] Save successful')
+        setEditingBook(null)
+      } catch (error) {
+        console.error('[BookEdit] Save failed:', error)
+        // 不关闭对话框，让用户可以重试
+        throw error
+      }
     },
     [editingBook, updateBook]
   )
@@ -179,6 +192,16 @@ export function BookshelfClient() {
   const handleEditClose = useCallback(() => {
     setEditingBook(null)
     setEditingBookGroupTags([])
+  }, [])
+
+  // --- Info dialog handlers (for non-admin users) ---
+
+  const handleInfoClick = useCallback((book: Book) => {
+    setInfoBook(book)
+  }, [])
+
+  const handleInfoClose = useCallback(() => {
+    setInfoBook(null)
   }, [])
 
   const handleGroupTagsChange = useCallback(
@@ -275,6 +298,18 @@ export function BookshelfClient() {
   }, [])
 
   const isLoading = booksLoading || categoriesLoading || categoryLoading
+
+  // Debug: log loading states
+  useEffect(() => {
+    console.log('[BookshelfClient] Loading states:', {
+      booksLoading,
+      categoriesLoading,
+      categoryLoading,
+      booksCount: books.length,
+      categoriesCount: categories.length,
+      booksError: booksError?.message,
+    })
+  }, [booksLoading, categoriesLoading, categoryLoading, books.length, categories.length, booksError])
 
   return (
     <motion.div
@@ -505,6 +540,7 @@ export function BookshelfClient() {
           loading={isLoading}
           onBookClick={handleBookClick}
           onEditClick={isAdmin ? handleEditClick : undefined}
+          onInfoClick={!isAdmin ? handleInfoClick : undefined}
         />
       )}
 
@@ -517,6 +553,15 @@ export function BookshelfClient() {
           onSave={handleEditSave}
           groupTags={editingBook.type === 'public' ? editingBookGroupTags : undefined}
           onGroupTagsChange={editingBook.type === 'public' ? handleGroupTagsChange : undefined}
+        />
+      )}
+
+      {/* Book info dialog (for non-admin users) */}
+      {infoBook && (
+        <BookInfoDialog
+          book={infoBook}
+          open={!!infoBook}
+          onClose={handleInfoClose}
         />
       )}
 

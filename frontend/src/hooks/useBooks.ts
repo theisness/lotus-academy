@@ -6,6 +6,9 @@ import type { Book, ShelfType } from '@/types/database'
 import type { BookMetadata } from '@/types/common'
 import type { UseBooksReturn } from '@/types/hooks'
 
+// 在模块级别获取单例客户端，避免每次渲染创建新实例
+const supabase = createClient()
+
 /**
  * useBooks Hook — 书籍管理
  *
@@ -21,13 +24,12 @@ export function useBooks(type: ShelfType): UseBooksReturn {
   const [error, setError] = useState<Error | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const supabase = createClient()
-
   /**
    * 从数据库获取书籍列表
    * 根据 type 过滤书架类型，根据 searchQuery 进行标题模糊搜索
    */
   const fetchBooks = useCallback(async () => {
+    console.log('[useBooks] fetchBooks started, type:', type, 'searchQuery:', searchQuery)
     setLoading(true)
     setError(null)
 
@@ -42,7 +44,9 @@ export function useBooks(type: ShelfType): UseBooksReturn {
         query = query.ilike('title', `%${searchQuery.trim()}%`)
       }
 
+      console.log('[useBooks] Executing query...')
       const { data, error: fetchError } = await query
+      console.log('[useBooks] Query result:', { dataLength: data?.length, error: fetchError?.message })
 
       if (fetchError) {
         // JWT 签名无效或 401 未授权时，说明存在过期/损坏的会话 token
@@ -53,7 +57,12 @@ export function useBooks(type: ShelfType): UseBooksReturn {
           || fetchError.code === 'PGRST301'
           || (fetchError as unknown as { status?: number }).status === 401
         if (isAuthError) {
-          await supabase.auth.signOut()
+          try {
+            await supabase.auth.signOut()
+          } catch {
+            // 忽略 signOut 错误
+          }
+          
           let retryQuery = supabase
             .from('books')
             .select('*')
@@ -67,9 +76,20 @@ export function useBooks(type: ShelfType): UseBooksReturn {
           const { data: retryData, error: retryError } = await retryQuery
 
           if (retryError) {
+            // 对于公共书架，即使出错也返回空数组而不是抛出错误
+            // 这样可以避免页面崩溃
+            if (type === 'public') {
+              setBooks([])
+              return
+            }
             throw new Error(retryError.message)
           }
           setBooks((retryData as Book[]) ?? [])
+          return
+        }
+        // 对于公共书架，即使出错也返回空数组
+        if (type === 'public') {
+          setBooks([])
           return
         }
         throw new Error(fetchError.message)
@@ -77,11 +97,16 @@ export function useBooks(type: ShelfType): UseBooksReturn {
 
       setBooks((data as Book[]) ?? [])
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('获取书籍列表失败'))
+      // 对于公共书架，设置空数组而不是错误状态
+      if (type === 'public') {
+        setBooks([])
+      } else {
+        setError(err instanceof Error ? err : new Error('获取书籍列表失败'))
+      }
     } finally {
       setLoading(false)
     }
-  }, [supabase, type, searchQuery])
+  }, [type, searchQuery])
 
   /**
    * 监听 type 和 searchQuery 变化，重新获取书籍列表
@@ -153,7 +178,7 @@ export function useBooks(type: ShelfType): UseBooksReturn {
 
       return newBook
     },
-    [supabase, type]
+    [type]
   )
 
   /**
@@ -161,6 +186,8 @@ export function useBooks(type: ShelfType): UseBooksReturn {
    */
   const updateBook = useCallback(
     async (id: string, data: Partial<BookMetadata>): Promise<void> => {
+      console.log('[useBooks] updateBook called:', { id, data })
+      
       const { error: updateError } = await supabase
         .from('books')
         .update({
@@ -170,8 +197,11 @@ export function useBooks(type: ShelfType): UseBooksReturn {
         .eq('id', id)
 
       if (updateError) {
+        console.error('[useBooks] Update error:', updateError)
         throw new Error(`书籍信息更新失败: ${updateError.message}`)
       }
+
+      console.log('[useBooks] Update successful')
 
       // 更新本地状态
       setBooks((prev) =>
@@ -182,7 +212,7 @@ export function useBooks(type: ShelfType): UseBooksReturn {
         )
       )
     },
-    [supabase]
+    []
   )
 
   /**

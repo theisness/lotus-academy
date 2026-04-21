@@ -12,6 +12,7 @@ export interface BookGridProps {
   loading: boolean
   onBookClick: (book: Book) => void
   onEditClick?: (book: Book) => void
+  onInfoClick?: (book: Book) => void
 }
 
 /** 栏目标签页组件 Props */
