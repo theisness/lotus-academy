@@ -28,6 +28,9 @@ Desktop.ini
 !docker/.env.example
 !frontend/.env.local.example
 
+# ---- 部署配置 ----
+script/deploy.env
+
 # ---- Node.js / 前端 ----
 node_modules/
 .next/
@@ -59,3 +62,4 @@ temp/
 *.tmp
 *.bak
 *.orig
+skills/curl-debug.md
