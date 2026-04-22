@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -66,6 +66,7 @@ export function PrivateBookshelfClient() {
     searchBooks,
     uploadBook,
     updateBook,
+    reorderBooks,
   } = useBooks('private')
   const { categories, loading: categoriesLoading, createCategory, updateCategory, deleteCategory, addBookToCategory, removeBookFromCategory } = useCategories('private')
 
@@ -172,7 +173,17 @@ export function PrivateBookshelfClient() {
     setEditingBook(null)
   }, [])
 
-  // --- Upload flow handlers ---
+
+  const handleReorderBooks = useCallback(
+    async (bookIds: string[]) => {
+      try {
+        await reorderBooks(bookIds)
+      } catch (error) {
+        console.error('[PrivateBookshelfClient] Reorder error:', error)
+      }
+    },
+    [reorderBooks]
+  )  // --- Upload flow handlers ---
 
   const handleFileSelected = useCallback((file: File) => {
     // Validate PDF
@@ -473,6 +484,8 @@ export function PrivateBookshelfClient() {
           loading={isLoading}
           onBookClick={handleBookClick}
           onEditClick={handleEditClick}
+          onReorder={handleReorderBooks}
+          canReorder={true}
         />
       )}
 
@@ -502,3 +515,6 @@ export function PrivateBookshelfClient() {
     </motion.div>
   )
 }
+
+
+

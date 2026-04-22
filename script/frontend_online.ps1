@@ -32,7 +32,7 @@ Write-Host ''
 
 $PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $FRONTEND_DIR = Join-Path $PROJECT_ROOT "frontend"
-$TEMP_TAR = Join-Path $env:TEMP "lotus-frontend-build.tar.gz"
+$TEMP_TAR = Join-Path $env:TEMP "lotus-frontend-build.zip"
 
 # 1. Local build with production env
 Write-Host '1/5 Building locally (npm run build)...' -ForegroundColor Cyan
@@ -74,6 +74,14 @@ New-Item -ItemType Directory -Path $STAGE_DIR -Force | Out-Null
 # Copy standalone (contains server.js + node_modules subset)
 Copy-Item -Path $STANDALONE_DIR -Destination (Join-Path $STAGE_DIR "app") -Recurse -Force
 
+
+# Remove unnecessary files from standalone to reduce archive size (~30MB savings)
+$nmDir = Join-Path $STAGE_DIR "app\node_modules"
+foreach ($dir in @('typescript', '@img', 'sharp', 'caniuse-lite')) {
+    $p = Join-Path $nmDir $dir
+    if (Test-Path $p) { Remove-Item $p -Recurse -Force; Write-Host "  Removed node_modules/$dir" -ForegroundColor DarkGray }
+}
+
 # Copy static assets into .next/static
 $staticDest = "$STAGE_DIR\app\.next\static"
 New-Item -ItemType Directory -Path $staticDest -Force | Out-Null
@@ -84,20 +92,18 @@ if (Test-Path $PUBLIC_DIR) {
     Copy-Item -Path $PUBLIC_DIR -Destination (Join-Path (Join-Path $STAGE_DIR "app") "public") -Recurse -Force
 }
 
-# Tar it
-Push-Location $STAGE_DIR
-tar -czf $TEMP_TAR app
-Pop-Location
+# Zip it (much faster than Windows tar on many small files)
+Compress-Archive -Path (Join-Path $STAGE_DIR "app") -DestinationPath $TEMP_TAR -CompressionLevel Optimal -Force
 
 $tarSize = (Get-Item $TEMP_TAR).Length
 Write-Host "  Archive size: $([math]::Round($tarSize / 1MB, 2)) MB" -ForegroundColor DarkGray
 
 # 3. Upload and extract
 Write-Host '3/5 Uploading to server...' -ForegroundColor Cyan
-scp -P $SSH_PORT $TEMP_TAR "${SSH_HOST}:${REMOTE_DIR}/frontend-build.tar.gz"
+scp -P $SSH_PORT $TEMP_TAR "${SSH_HOST}:${REMOTE_DIR}/frontend-build.zip"
 
 Write-Host '4/5 Deploying on server...' -ForegroundColor Cyan
-ssh -p $SSH_PORT $SSH_HOST "cd $REMOTE_DIR && rm -rf frontend-app && tar -xzf frontend-build.tar.gz && mv app frontend-app && rm frontend-build.tar.gz && echo 'Extracted OK'"
+ssh -p $SSH_PORT $SSH_HOST "cd $REMOTE_DIR && rm -rf frontend-app && unzip -qo frontend-build.zip -d . && mv app frontend-app && rm frontend-build.zip && echo 'Extracted OK'"
 
 # Start/restart with a simple node process (using systemd or docker)
 # Here we use a systemd service approach for simplicity

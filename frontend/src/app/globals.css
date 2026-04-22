@@ -62,6 +62,11 @@ body {
   color: var(--color-text);
 }
 
+/* PDF 阅读器文本层：全局 ::selection 的 color 属性会导致文字重影，重置为透明 */
+.PdfHighlighter .textLayer ::selection {
+  color: transparent;
+}
+
 /*
  * Utility: hide scrollbar while keeping scroll functionality
  * Used by CategoryTabs horizontal scroll
@@ -72,4 +77,10 @@ body {
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+
+/* PDF 阅读器内禁用原生选中样式，避免与 pdf-highlighter 的选中颜色重影 */
+.PdfHighlighter ::selection {
+  background-color: transparent;
 }

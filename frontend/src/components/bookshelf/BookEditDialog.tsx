@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useCallback, useRef, useEffect, type KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -217,18 +217,17 @@ const [showTagSuggestions, setShowTagSuggestions] = useState(false)
         return
       }
 
-      // Search for existing group tags
       const { data } = await supabase
-        .from('book_group_tags')
-        .select('group_tag')
-        .ilike('group_tag', `%${value.trim()}%`)
-        .limit(5)
+        .from('profiles')
+        .select('group_tags')
+        .not('group_tags', 'is', null)
 
       if (data && data.length > 0) {
-        // Get unique tags
-        const uniqueTags = [...new Set(data.map((row: { group_tag: string }) => row.group_tag))] as string[]
-        // Filter out already selected tags
-        const filtered = uniqueTags.filter((tag) => !groupTags?.includes(tag))
+        const allTags = [...new Set(data.flatMap((r: { group_tags: string[] | null }) => r.group_tags ?? []))] as string[]
+        const filtered = allTags
+          .filter((tag) => tag.toLowerCase().includes(value.trim().toLowerCase()))
+          .filter((tag) => !groupTags?.includes(tag))
+          .slice(0, 5)
         setTagSuggestions(filtered)
         setShowTagSuggestions(filtered.length > 0)
       } else {

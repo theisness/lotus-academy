@@ -14,7 +14,8 @@ import {
   DotsThree,
   BookOpenText,
   BookOpen,
-  Columns,
+  List,
+  Highlighter,
 } from '@phosphor-icons/react'
 import { HIGHLIGHT_COLORS } from './PdfReader'
 
@@ -44,21 +45,40 @@ interface ReaderToolbarProps {
   bookTitle: string
   currentPage: number
   totalPages: number
-  scale: number
+  scale: number | 'page-actual' | 'page-width' | 'page-height' | 'page-fit' | 'auto'
   canAnnotate: boolean
   activeColor: string
   notePanelOpen: boolean
   noteCount: number
+  outlineOpen: boolean
+  annotationPanelOpen: boolean
+  highlightCount: number
   onBack: () => void
   onPageChange: (page: number) => void
   onScaleChange: (scale: number) => void
   onColorChange: (color: string) => void
   onToggleNotePanel: () => void
-  viewMode: 'scroll' | 'single' | 'spread'
-  onViewModeChange: (mode: 'scroll' | 'single' | 'spread') => void
+  onToggleOutline: () => void
+  onToggleAnnotationPanel: () => void
+  scrollType: 'scroll' | 'page'
+  displayMode: 'single' | 'double'
+  onScrollTypeChange: (type: 'scroll' | 'page') => void
+  onDisplayModeChange: (mode: 'single' | 'double') => void
 }
 
-const SCALE_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+const SCALE_STEPS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+
+/** 将 scale 值转为显示文本 */
+function scaleLabel(scale: number | string): string {
+  if (typeof scale === 'string') return '自适应'
+  return `${Math.round(scale * 100)}%`
+}
+
+/** 将 scale 转为滑动条值（50-200） */
+function scaleToSlider(scale: number | string): number {
+  if (typeof scale === 'string') return 100
+  return Math.round(Math.min(200, Math.max(25, scale * 100)))
+}
 
 export function ReaderToolbar({
   bookTitle,
@@ -69,13 +89,20 @@ export function ReaderToolbar({
   activeColor,
   notePanelOpen,
   noteCount,
+  outlineOpen,
+  annotationPanelOpen,
+  highlightCount,
   onBack,
   onPageChange,
   onScaleChange,
   onColorChange,
   onToggleNotePanel,
-  viewMode,
-  onViewModeChange,
+  onToggleOutline,
+  onToggleAnnotationPanel,
+  scrollType,
+  displayMode,
+  onScrollTypeChange,
+  onDisplayModeChange,
 }: ReaderToolbarProps) {
   const [pageInput, setPageInput] = useState(String(currentPage))
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -134,12 +161,14 @@ export function ReaderToolbar({
   )
 
   const handleZoomIn = useCallback(() => {
-    const nextStep = SCALE_STEPS.find((s) => s > scale)
+    const current = typeof scale === 'string' ? 1.0 : scale
+    const nextStep = SCALE_STEPS.find((s) => s > current)
     if (nextStep) onScaleChange(nextStep)
   }, [scale, onScaleChange])
 
   const handleZoomOut = useCallback(() => {
-    const prevStep = [...SCALE_STEPS].reverse().find((s) => s < scale)
+    const current = typeof scale === 'string' ? 1.0 : scale
+    const prevStep = [...SCALE_STEPS].reverse().find((s) => s < current)
     if (prevStep) onScaleChange(prevStep)
   }, [scale, onScaleChange])
 
@@ -168,7 +197,7 @@ export function ReaderToolbar({
       <div className="flex items-center gap-0.5 sm:gap-1">
         {/* 翻页 */}
         <button
-          onClick={() => onPageChange(currentPage - 1)}
+          onClick={() => onPageChange(currentPage - (displayMode === 'double' ? 2 : 1))}
           disabled={currentPage <= 1}
           className="flex h-8 w-8 items-center justify-center rounded-lg
             text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
@@ -202,7 +231,7 @@ export function ReaderToolbar({
         </form>
 
         <button
-          onClick={() => onPageChange(currentPage + 1)}
+          onClick={() => onPageChange(currentPage + (displayMode === 'double' ? 2 : 1))}
           disabled={currentPage >= totalPages}
           className="flex h-8 w-8 items-center justify-center rounded-lg
             text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
@@ -213,38 +242,53 @@ export function ReaderToolbar({
           <CaretRight size={16} weight="bold" />
         </button>
 
-        {/* 翻页模式切换 — 仅桌面端显示 */}
+        {/* 翻页方式 + 显示方式 — 仅桌面端显示 */}
         <div className="hidden sm:flex items-center gap-0.5">
           <div className="mx-1 h-5 w-px bg-zinc-700" />
+          {/* 翻页方式：滚动 / 单屏 */}
           <button
-            onClick={() => onViewModeChange('scroll')}
+            onClick={() => onScrollTypeChange('scroll')}
             className={`flex h-8 w-8 items-center justify-center rounded-lg
               transition-colors active:scale-[0.98]
-              ${viewMode === 'scroll' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
-            aria-label="滚动模式"
+              ${scrollType === 'scroll' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+            aria-label="滚动翻页"
             title="滚动"
           >
-            <BookOpenText size={16} weight={viewMode === 'scroll' ? 'fill' : 'regular'} />
+            <BookOpenText size={16} weight={scrollType === 'scroll' ? 'fill' : 'regular'} />
           </button>
           <button
-            onClick={() => onViewModeChange('single')}
+            onClick={() => onScrollTypeChange('page')}
             className={`flex h-8 w-8 items-center justify-center rounded-lg
               transition-colors active:scale-[0.98]
-              ${viewMode === 'single' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
-            aria-label="单页模式"
+              ${scrollType === 'page' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+            aria-label="单屏切换"
+            title="单屏"
+          >
+            <BookOpen size={16} weight={scrollType === 'page' ? 'fill' : 'regular'} />
+          </button>
+
+          <div className="mx-0.5 h-5 w-px bg-zinc-700/50" />
+
+          {/* 显示方式：单页 / 双页 */}
+          <button
+            onClick={() => onDisplayModeChange('single')}
+            className={`flex h-8 items-center gap-1 rounded-lg px-2
+              transition-colors active:scale-[0.98] text-xs
+              ${displayMode === 'single' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+            aria-label="单页显示"
             title="单页"
           >
-            <BookOpen size={16} weight={viewMode === 'single' ? 'fill' : 'regular'} />
+            单页
           </button>
           <button
-            onClick={() => onViewModeChange('spread')}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg
-              transition-colors active:scale-[0.98]
-              ${viewMode === 'spread' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
-            aria-label="双页模式"
+            onClick={() => onDisplayModeChange('double')}
+            className={`flex h-8 items-center gap-1 rounded-lg px-2
+              transition-colors active:scale-[0.98] text-xs
+              ${displayMode === 'double' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+            aria-label="双页显示"
             title="双页"
           >
-            <Columns size={16} weight={viewMode === 'spread' ? 'fill' : 'regular'} />
+            双页
           </button>
         </div>
 
@@ -254,7 +298,7 @@ export function ReaderToolbar({
 
           <button
             onClick={handleZoomOut}
-            disabled={scale <= SCALE_STEPS[0]}
+            disabled={typeof scale === 'number' && scale <= SCALE_STEPS[0]}
             className="flex h-8 w-8 items-center justify-center rounded-lg
               text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
               disabled:opacity-40 disabled:cursor-not-allowed
@@ -263,12 +307,27 @@ export function ReaderToolbar({
           >
             <MagnifyingGlassMinus size={16} weight="regular" />
           </button>
-          <span className="text-xs text-zinc-400 tabular-nums w-10 text-center">
-            {Math.round(scale * 100)}%
-          </span>
+
+          {/* 滑动条 + 百分比显示 */}
+          <div className="flex items-center gap-1.5">
+            <input
+              type="range"
+              min={25}
+              max={200}
+              step={5}
+              value={scaleToSlider(scale)}
+              onChange={(e) => onScaleChange(Number(e.target.value) / 100)}
+              className="w-20 h-1 accent-zinc-400 cursor-pointer"
+              aria-label="缩放"
+            />
+            <span className="text-xs text-zinc-400 tabular-nums w-12 text-center">
+              {scaleLabel(scale)}
+            </span>
+          </div>
+
           <button
             onClick={handleZoomIn}
-            disabled={scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
+            disabled={typeof scale === 'number' && scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
             className="flex h-8 w-8 items-center justify-center rounded-lg
               text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
               disabled:opacity-40 disabled:cursor-not-allowed
@@ -341,7 +400,41 @@ export function ReaderToolbar({
           </div>
         )}
 
+        {/* 章节目录切换 */}
+        <button
+          onClick={onToggleOutline}
+          className={`flex h-8 w-8 items-center justify-center rounded-lg
+            transition-colors active:scale-[0.98]
+            ${outlineOpen
+              ? 'bg-zinc-700 text-zinc-200'
+              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+            }`}
+          aria-label="章节目录"
+        >
+          <List size={18} weight="regular" />
+        </button>
+
         {/* 笔记面板切换 */}
+        <button
+          onClick={onToggleAnnotationPanel}
+          className={`relative flex h-8 w-8 items-center justify-center rounded-lg
+            transition-colors active:scale-[0.98]
+            ${annotationPanelOpen
+              ? 'bg-zinc-700 text-zinc-200'
+              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+            }`}
+          aria-label="批注管理"
+        >
+          <Highlighter size={18} weight="regular" />
+          {highlightCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center
+              rounded-full bg-[var(--color-accent)] px-1 text-[10px] font-medium text-white">
+              {highlightCount}
+            </span>
+          )}
+        </button>
+
+        {/* 页面笔记切换 */}
         <button
           onClick={onToggleNotePanel}
           className={`relative flex h-8 w-8 items-center justify-center rounded-lg
@@ -395,37 +488,51 @@ export function ReaderToolbar({
                   rounded-lg bg-zinc-800 border border-zinc-700 p-3 shadow-xl
                   min-w-[180px]"
               >
-                {/* 翻页模式 */}
+                {/* 翻页方式 */}
                 <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-2">
-                  翻页模式
+                  翻页方式
                 </p>
-                <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-3">
                   <button
-                    onClick={() => onViewModeChange('scroll')}
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg
-                      transition-colors active:scale-[0.98]
-                      ${viewMode === 'scroll' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
-                    aria-label="滚动模式"
+                    onClick={() => onScrollTypeChange('scroll')}
+                    className={`flex h-8 items-center gap-1 rounded-lg px-2
+                      transition-colors active:scale-[0.98] text-xs
+                      ${scrollType === 'scroll' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
                   >
-                    <BookOpenText size={16} weight={viewMode === 'scroll' ? 'fill' : 'regular'} />
+                    <BookOpenText size={14} weight={scrollType === 'scroll' ? 'fill' : 'regular'} />
+                    滚动
                   </button>
                   <button
-                    onClick={() => onViewModeChange('single')}
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg
-                      transition-colors active:scale-[0.98]
-                      ${viewMode === 'single' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
-                    aria-label="单页模式"
+                    onClick={() => onScrollTypeChange('page')}
+                    className={`flex h-8 items-center gap-1 rounded-lg px-2
+                      transition-colors active:scale-[0.98] text-xs
+                      ${scrollType === 'page' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
                   >
-                    <BookOpen size={16} weight={viewMode === 'single' ? 'fill' : 'regular'} />
+                    <BookOpen size={14} weight={scrollType === 'page' ? 'fill' : 'regular'} />
+                    单屏
+                  </button>
+                </div>
+
+                {/* 显示方式 */}
+                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-2">
+                  显示方式
+                </p>
+                <div className="flex items-center gap-2 mb-3">
+                  <button
+                    onClick={() => onDisplayModeChange('single')}
+                    className={`flex h-8 items-center rounded-lg px-2
+                      transition-colors active:scale-[0.98] text-xs
+                      ${displayMode === 'single' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
+                  >
+                    单页
                   </button>
                   <button
-                    onClick={() => onViewModeChange('spread')}
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg
-                      transition-colors active:scale-[0.98]
-                      ${viewMode === 'spread' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
-                    aria-label="双页模式"
+                    onClick={() => onDisplayModeChange('double')}
+                    className={`flex h-8 items-center rounded-lg px-2
+                      transition-colors active:scale-[0.98] text-xs
+                      ${displayMode === 'double' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
                   >
-                    <Columns size={16} weight={viewMode === 'spread' ? 'fill' : 'regular'} />
+                    双页
                   </button>
                 </div>
 
@@ -436,7 +543,7 @@ export function ReaderToolbar({
                 <div className="flex items-center justify-between gap-2">
                   <button
                     onClick={handleZoomOut}
-                    disabled={scale <= SCALE_STEPS[0]}
+                    disabled={typeof scale === 'number' && scale <= SCALE_STEPS[0]}
                     className="flex h-8 w-8 items-center justify-center rounded-lg
                       text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700
                       disabled:opacity-40 disabled:cursor-not-allowed
@@ -446,11 +553,11 @@ export function ReaderToolbar({
                     <MagnifyingGlassMinus size={16} weight="regular" />
                   </button>
                   <span className="text-xs text-zinc-300 tabular-nums flex-1 text-center">
-                    {Math.round(scale * 100)}%
+                    {scaleLabel(scale)}
                   </span>
                   <button
                     onClick={handleZoomIn}
-                    disabled={scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
+                    disabled={typeof scale === 'number' && scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
                     className="flex h-8 w-8 items-center justify-center rounded-lg
                       text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700
                       disabled:opacity-40 disabled:cursor-not-allowed

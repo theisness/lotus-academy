@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import React from 'react'
@@ -16,8 +16,9 @@ import type {
   PdfHighlighterUtils,
   PdfSelection,
   ScaledPosition,
+  PdfScaleValue,
 } from 'react-pdf-highlighter-extended'
-import { SpinnerGap, WarningCircle } from '@phosphor-icons/react'
+import { SpinnerGap, WarningCircle, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { useAnnotations } from '@/hooks/useAnnotations'
 import type { AnnotationPosition } from '@/types/database'
@@ -25,6 +26,8 @@ import { ReaderToolbar } from './ReaderToolbar'
 import { NotePanel } from './NotePanel'
 import { SelectionTip } from './SelectionTip'
 import { HighlightPopup } from './HighlightPopup'
+import { OutlinePanel } from './OutlinePanel'
+import { AnnotationPanel } from './AnnotationPanel'
 
 import 'react-pdf-highlighter-extended/dist/esm/style/TextHighlight.css'
 import 'react-pdf-highlighter-extended/dist/esm/style/PdfHighlighter.css'
@@ -85,10 +88,11 @@ export function PdfReader({
   } = useAnnotations(bookId)
 
   const highlighterUtilsRef = useRef<PdfHighlighterUtils>()
+  const currentSelectionRef = useRef<PdfSelection | null>(null)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [scale, setScale] = useState<number>(1.0)
+  const [scale, setScale] = useState<PdfScaleValue>(1.0)
   const [activeColor, setActiveColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(COLOR_STORAGE_KEY)
@@ -100,16 +104,26 @@ export function PdfReader({
   })
   const [notePanelOpen, setNotePanelOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [outlineOpen, setOutlineOpen] = useState(false)
+  const [annotationPanelOpen, setAnnotationPanelOpen] = useState(false)
+  const pdfDocumentRef = useRef<import('pdfjs-dist').PDFDocumentProxy | null>(null)
 
-  /** 阅读模式：scroll（滚动）、single（单页）、spread（双页） */
-  const [viewMode, setViewMode] = useState<'scroll' | 'single' | 'spread'>(() => {
+  /** 翻页方式：scroll（滚动）、page（单屏切换） */
+  const [scrollType, setScrollType] = useState<'scroll' | 'page'>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('reader-view-mode')
-      if (saved === 'scroll' || saved === 'single' || saved === 'spread') {
-        return saved
-      }
+      const saved = localStorage.getItem('reader-scroll-type')
+      if (saved === 'scroll' || saved === 'page') return saved
     }
     return 'scroll'
+  })
+
+  /** 显示方式：single（单页）、double（双页） */
+  const [displayMode, setDisplayMode] = useState<'single' | 'double'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('reader-display-mode')
+      if (saved === 'single' || saved === 'double') return saved
+    }
+    return 'single'
   })
 
   /** 切换颜色并持久化到 localStorage */
@@ -144,41 +158,95 @@ export function PdfReader({
       }))
   }, [annotations])
 
-  /** 当前页面的笔记 */
-  const currentPageNotes = useMemo(() => {
-    return annotations.filter(
-      (ann) => ann.type === 'note' && ann.page_number === currentPage
-    )
-  }, [annotations, currentPage])
+  const handleScrollToHighlight = useCallback((id: string) => {
+    const hl = highlights.find((h) => h.id === id)
+    if (hl) {
+      highlighterUtilsRef.current?.scrollToHighlight(hl)
+      setScrolledToHighlightId(id)
+    }
+  }, [highlights])
+
+  /** 所有笔记 */
+  const allNotes = useMemo(() => {
+    return annotations.filter((ann) => ann.type === 'note')
+  }, [annotations])
 
   /**
-   * 处理文本选中后创建高亮
+   * 处理文本选中，保存选区到 currentSelectionRef
    */
   const handleSelection = useCallback(
-    async (selection: PdfSelection) => {
+    (selection: PdfSelection) => {
       if (!canAnnotate) return
-
-      const ghostHighlight = selection.makeGhostHighlight()
-      if (!ghostHighlight) return
-
-      try {
-        await addAnnotation({
-          type: 'highlight',
-          position: ghostHighlight.position as unknown as AnnotationPosition,
-          color: activeColor,
-          content: null,
-          page_number: ghostHighlight.position.boundingRect.pageNumber,
-        })
-      } catch {
-        // 静默处理错误
-      }
-
-      // 清除选中状态
-      highlighterUtilsRef.current?.removeGhostHighlight()
-      highlighterUtilsRef.current?.setTip(null)
+      currentSelectionRef.current = selection
     },
-    [canAnnotate, addAnnotation, activeColor]
+    [canAnnotate]
   )
+
+  /**
+   * 创建高亮
+   */
+  const handleCreateHighlight = useCallback(async () => {
+    if (!canAnnotate || !currentSelectionRef.current) return
+
+    const ghostHighlight = currentSelectionRef.current.makeGhostHighlight()
+    if (!ghostHighlight) return
+
+    try {
+      await addAnnotation({
+        type: 'highlight',
+        position: ghostHighlight.position as unknown as AnnotationPosition,
+        color: activeColor,
+        content: null,
+        page_number: ghostHighlight.position.boundingRect.pageNumber,
+      })
+    } catch {
+      // 静默处理错误
+    }
+
+    // 清除选中状态
+    highlighterUtilsRef.current?.removeGhostHighlight()
+    highlighterUtilsRef.current?.setTip(null)
+    currentSelectionRef.current = null
+  }, [canAnnotate, addAnnotation, activeColor])
+
+  /**
+   * 取消选区
+   */
+  const handleCancelSelection = useCallback(() => {
+    highlighterUtilsRef.current?.removeGhostHighlight()
+    highlighterUtilsRef.current?.setTip(null)
+    currentSelectionRef.current = null
+  }, [])
+
+  /**
+   * 上一页（双页模式一次翻两页）
+   */
+  const handlePrevPage = useCallback(() => {
+    const step = displayMode === 'double' ? 2 : 1
+    const newPage = Math.max(1, currentPage - step)
+    if (newPage !== currentPage) {
+      setCurrentPage(newPage)
+      const viewer = highlighterUtilsRef.current?.getViewer()
+      if (viewer) {
+        viewer.currentPageNumber = newPage
+      }
+    }
+  }, [currentPage, displayMode])
+
+  /**
+   * 下一页（双页模式一次翻两页）
+   */
+  const handleNextPage = useCallback(() => {
+    const step = displayMode === 'double' ? 2 : 1
+    const newPage = Math.min(totalPages, currentPage + step)
+    if (newPage !== currentPage) {
+      setCurrentPage(newPage)
+      const viewer = highlighterUtilsRef.current?.getViewer()
+      if (viewer) {
+        viewer.currentPageNumber = newPage
+      }
+    }
+  }, [currentPage, totalPages, displayMode])
 
   /**
    * 删除高亮批注
@@ -290,27 +358,28 @@ export function PdfReader({
   /**
    * 切换阅读模式
    */
-  const handleViewModeChange = useCallback((mode: 'scroll' | 'single' | 'spread') => {
-    setViewMode(mode)
-    try {
-      localStorage.setItem('reader-view-mode', mode)
-    } catch {
-      // 静默处理
-    }
+  /** 应用 PDF.js viewer 的滚动和显示模式 */
+  const applyViewerModes = useCallback((scroll: 'scroll' | 'page', display: 'single' | 'double') => {
     const viewer = highlighterUtilsRef.current?.getViewer()
-    if (viewer) {
-      if (mode === 'scroll') {
-        viewer.scrollMode = ScrollMode.VERTICAL
-        viewer.spreadMode = SpreadMode.NONE
-      } else if (mode === 'single') {
-        viewer.scrollMode = ScrollMode.PAGE
-        viewer.spreadMode = SpreadMode.NONE
-      } else if (mode === 'spread') {
-        viewer.scrollMode = ScrollMode.PAGE
-        viewer.spreadMode = SpreadMode.ODD
-      }
+    if (!viewer) return
+    viewer.scrollMode = scroll === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
+    viewer.spreadMode = display === 'double' ? SpreadMode.ODD : SpreadMode.NONE
+    if (scroll === 'page' || display === 'double') {
+      setScale(display === 'double' ? 'page-fit' : 'page-width')
     }
   }, [])
+
+  const handleScrollTypeChange = useCallback((type: 'scroll' | 'page') => {
+    setScrollType(type)
+    try { localStorage.setItem('reader-scroll-type', type) } catch {}
+    applyViewerModes(type, displayMode)
+  }, [displayMode, applyViewerModes])
+
+  const handleDisplayModeChange = useCallback((mode: 'single' | 'double') => {
+    setDisplayMode(mode)
+    try { localStorage.setItem('reader-display-mode', mode) } catch {}
+    applyViewerModes(scrollType, mode)
+  }, [scrollType, applyViewerModes])
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900">
@@ -323,18 +392,38 @@ export function PdfReader({
         canAnnotate={canAnnotate}
         activeColor={activeColor}
         notePanelOpen={notePanelOpen}
-        noteCount={currentPageNotes.length}
+        noteCount={allNotes.length}
         onBack={onBack}
         onPageChange={handlePageChange}
         onScaleChange={handleScaleChange}
         onColorChange={handleColorChange}
-        onToggleNotePanel={() => setNotePanelOpen((prev) => !prev)}
-        viewMode={viewMode}
-        onViewModeChange={handleViewModeChange}
+        onToggleNotePanel={() => { setNotePanelOpen((prev) => !prev); setAnnotationPanelOpen(false) }}
+        outlineOpen={outlineOpen}
+        onToggleOutline={() => setOutlineOpen((prev) => !prev)}
+        annotationPanelOpen={annotationPanelOpen}
+        onToggleAnnotationPanel={() => { setAnnotationPanelOpen((prev) => !prev); setNotePanelOpen(false) }}
+        highlightCount={highlights.length}
+        scrollType={scrollType}
+        displayMode={displayMode}
+        onScrollTypeChange={handleScrollTypeChange}
+        onDisplayModeChange={handleDisplayModeChange}
       />
 
       {/* 主内容区 */}
       <div className="relative flex flex-1 overflow-hidden">
+        {/* 章节边栏 */}
+        {outlineOpen && pdfDocumentRef.current && (
+          <div className="w-64 shrink-0 border-r border-zinc-700 bg-zinc-800/50 overflow-hidden flex flex-col">
+            <div className="px-3 py-2 border-b border-zinc-700 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+              章节目录
+            </div>
+            <OutlinePanel
+              pdfDocument={pdfDocumentRef.current}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
+
         {/* PDF 阅读器 */}
         <div className="relative flex-1 overflow-auto">
           {/* 加载指示器 - 始终显示直到 PDF 加载完成 */}
@@ -394,7 +483,9 @@ export function PdfReader({
               )
             }}
           >
-            {(pdfDocument) => (
+            {(pdfDocument) => {
+              pdfDocumentRef.current = pdfDocument
+              return (
                 <PdfHighlighterWithPages
                   key={fileUrl}
                   pdfDocument={pdfDocument}
@@ -404,8 +495,22 @@ export function PdfReader({
                   pdfScaleValue={scale}
                   onSelection={canAnnotate ? handleSelection : undefined}
                   textSelectionColor={canAnnotate ? activeColor : 'transparent'}
-                  utilsRef={(utils) => { highlighterUtilsRef.current = utils }}
-                  selectionTip={canAnnotate ? <SelectionTip activeColor={activeColor} /> : undefined}
+                  utilsRef={(utils) => {
+                    highlighterUtilsRef.current = utils
+                    const viewer = utils.getViewer()
+                    if (viewer?.eventBus) {
+                      viewer.eventBus.on('pagechanging', (e: { pageNumber: number }) => {
+                        setCurrentPage(e.pageNumber)
+                      })
+                    }
+                  }}
+                  selectionTip={canAnnotate ? (
+                    <SelectionTip 
+                      activeColor={activeColor} 
+                      onHighlight={handleCreateHighlight}
+                      onCancel={handleCancelSelection}
+                    />
+                  ) : undefined}
                   onScrollAway={() => setScrolledToHighlightId(null)}
                 >
                   <HighlightContainer
@@ -415,20 +520,61 @@ export function PdfReader({
                     scrolledToHighlightId={scrolledToHighlightId}
                   />
                 </PdfHighlighterWithPages>
-            )}
+              )
+            }}
           </PdfLoader>
+
+          {/* 边缘翻页箭头（仅在单屏切换模式显示） */}
+          {scrollType === 'page' && (
+            <>
+              <div className="absolute left-0 top-0 bottom-0 w-16 z-20 group flex items-center justify-start pl-2">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage <= 1}
+                  className="p-2 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
+                    opacity-0 group-hover:opacity-100 transition-opacity duration-300
+                    disabled:opacity-0 disabled:cursor-not-allowed"
+                >
+                  <CaretLeft size={20} className="text-zinc-400" />
+                </button>
+              </div>
+              <div className="absolute right-0 top-0 bottom-0 w-16 z-20 group flex items-center justify-end pr-2">
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage >= totalPages}
+                  className="p-2 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
+                    opacity-0 group-hover:opacity-100 transition-opacity duration-300
+                    disabled:opacity-0 disabled:cursor-not-allowed"
+                >
+                  <CaretRight size={20} className="text-zinc-400" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* 笔记面板 */}
         {notePanelOpen && (
           <NotePanel
-            notes={currentPageNotes}
+            notes={allNotes}
             currentPage={currentPage}
             canAnnotate={canAnnotate}
             onAddNote={handleAddNote}
             onUpdateNote={handleUpdateNote}
             onDeleteNote={handleDeleteNote}
             onClose={() => setNotePanelOpen(false)}
+          />
+        )}
+
+        {/* 批注管理面板 */}
+        {annotationPanelOpen && (
+          <AnnotationPanel
+            annotations={annotations}
+            canAnnotate={canAnnotate}
+            onDelete={handleDeleteHighlight}
+            onUpdateComment={handleUpdateComment}
+            onScrollTo={handleScrollToHighlight}
+            onClose={() => setAnnotationPanelOpen(false)}
           />
         )}
       </div>
@@ -532,10 +678,3 @@ function HighlightContainer({
 
   return component
 }
-
-
-
-
-
-
-
