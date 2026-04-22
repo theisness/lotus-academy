@@ -92,8 +92,10 @@ if (Test-Path $PUBLIC_DIR) {
     Copy-Item -Path $PUBLIC_DIR -Destination (Join-Path (Join-Path $STAGE_DIR "app") "public") -Recurse -Force
 }
 
-# Zip it (much faster than Windows tar on many small files)
-Compress-Archive -Path (Join-Path $STAGE_DIR "app") -DestinationPath $TEMP_TAR -CompressionLevel Optimal -Force
+# Zip via WSL (much faster than PowerShell Compress-Archive)
+$wslStage = wsl wslpath -u ($STAGE_DIR -replace "\\","/")
+$wslTar = wsl wslpath -u ($TEMP_TAR -replace "\\","/")
+wsl bash -c "cd '$wslStage' && zip -qr '$wslTar' app"
 
 $tarSize = (Get-Item $TEMP_TAR).Length
 Write-Host "  Archive size: $([math]::Round($tarSize / 1MB, 2)) MB" -ForegroundColor DarkGray
@@ -132,7 +134,12 @@ systemctl restart lotus-frontend
 echo 'Service restarted'
 '@
 
+$SERVICE_SCRIPT_RESTART = @'
+systemctl restart lotus-frontend
+echo 'Service restarted'
+'@
 # ssh -p $SSH_PORT $SSH_HOST $SERVICE_SCRIPT
+ssh -p $SSH_PORT $SSH_HOST $SERVICE_SCRIPT_RESTART
 
 # Cleanup
 Remove-Item $TEMP_TAR -ErrorAction SilentlyContinue

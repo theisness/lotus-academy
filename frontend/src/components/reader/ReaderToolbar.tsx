@@ -15,7 +15,6 @@ import {
   BookOpenText,
   BookOpen,
   List,
-  Highlighter,
 } from '@phosphor-icons/react'
 import { HIGHLIGHT_COLORS } from './PdfReader'
 
@@ -45,21 +44,19 @@ interface ReaderToolbarProps {
   bookTitle: string
   currentPage: number
   totalPages: number
-  scale: number | 'page-actual' | 'page-width' | 'page-height' | 'page-fit' | 'auto'
+  scale: number
   canAnnotate: boolean
   activeColor: string
-  notePanelOpen: boolean
+  sidePanelOpen: boolean
   noteCount: number
-  outlineOpen: boolean
-  annotationPanelOpen: boolean
   highlightCount: number
+  outlineOpen: boolean
+  onToggleSidePanel: () => void
   onBack: () => void
   onPageChange: (page: number) => void
   onScaleChange: (scale: number) => void
   onColorChange: (color: string) => void
-  onToggleNotePanel: () => void
   onToggleOutline: () => void
-  onToggleAnnotationPanel: () => void
   scrollType: 'scroll' | 'page'
   displayMode: 'single' | 'double'
   onScrollTypeChange: (type: 'scroll' | 'page') => void
@@ -69,14 +66,12 @@ interface ReaderToolbarProps {
 const SCALE_STEPS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
 /** 将 scale 值转为显示文本 */
-function scaleLabel(scale: number | string): string {
-  if (typeof scale === 'string') return '自适应'
+function scaleLabel(scale: number): string {
   return `${Math.round(scale * 100)}%`
 }
 
-/** 将 scale 转为滑动条值（50-200） */
-function scaleToSlider(scale: number | string): number {
-  if (typeof scale === 'string') return 100
+/** 将 scale 转为滑动条值（25-200） */
+function scaleToSlider(scale: number): number {
   return Math.round(Math.min(200, Math.max(25, scale * 100)))
 }
 
@@ -87,18 +82,16 @@ export function ReaderToolbar({
   scale,
   canAnnotate,
   activeColor,
-  notePanelOpen,
+  sidePanelOpen,
   noteCount,
-  outlineOpen,
-  annotationPanelOpen,
   highlightCount,
+  outlineOpen,
   onBack,
   onPageChange,
   onScaleChange,
   onColorChange,
-  onToggleNotePanel,
+  onToggleSidePanel,
   onToggleOutline,
-  onToggleAnnotationPanel,
   scrollType,
   displayMode,
   onScrollTypeChange,
@@ -117,7 +110,7 @@ export function ReaderToolbar({
 
   // 点击外部关闭颜色选择器
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: PointerEvent) {
       if (
         colorPickerRef.current &&
         !colorPickerRef.current.contains(e.target as Node)
@@ -126,14 +119,14 @@ export function ReaderToolbar({
       }
     }
     if (colorPickerOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('pointerdown', handleClickOutside)
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('pointerdown', handleClickOutside)
   }, [colorPickerOpen])
 
   // 点击外部关闭溢出菜单
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: PointerEvent) {
       if (
         overflowRef.current &&
         !overflowRef.current.contains(e.target as Node)
@@ -142,9 +135,9 @@ export function ReaderToolbar({
       }
     }
     if (mobileOverflowOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('pointerdown', handleClickOutside)
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('pointerdown', handleClickOutside)
   }, [mobileOverflowOpen])
 
   const handlePageInputSubmit = useCallback(
@@ -161,14 +154,12 @@ export function ReaderToolbar({
   )
 
   const handleZoomIn = useCallback(() => {
-    const current = typeof scale === 'string' ? 1.0 : scale
-    const nextStep = SCALE_STEPS.find((s) => s > current)
+    const nextStep = SCALE_STEPS.find((s) => s > scale + 0.01)
     if (nextStep) onScaleChange(nextStep)
   }, [scale, onScaleChange])
 
   const handleZoomOut = useCallback(() => {
-    const current = typeof scale === 'string' ? 1.0 : scale
-    const prevStep = [...SCALE_STEPS].reverse().find((s) => s < current)
+    const prevStep = [...SCALE_STEPS].reverse().find((s) => s < scale - 0.01)
     if (prevStep) onScaleChange(prevStep)
   }, [scale, onScaleChange])
 
@@ -242,6 +233,31 @@ export function ReaderToolbar({
           <CaretRight size={16} weight="bold" />
         </button>
 
+        {/* 移动端缩放按钮 — 直接显示在工具栏 */}
+        <div className="flex sm:hidden items-center gap-0.5">
+          <button
+            onPointerUp={handleZoomOut}
+            disabled={scale <= SCALE_STEPS[0]}
+            className="flex h-8 w-8 items-center justify-center rounded-lg
+              text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
+              disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="缩小"
+          >
+            <MagnifyingGlassMinus size={16} />
+          </button>
+          <span className="text-[11px] text-zinc-400 tabular-nums w-9 text-center">{scaleLabel(scale)}</span>
+          <button
+            onPointerUp={handleZoomIn}
+            disabled={scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
+            className="flex h-8 w-8 items-center justify-center rounded-lg
+              text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
+              disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="放大"
+          >
+            <MagnifyingGlassPlus size={16} />
+          </button>
+        </div>
+
         {/* 翻页方式 + 显示方式 — 仅桌面端显示 */}
         <div className="hidden sm:flex items-center gap-0.5">
           <div className="mx-1 h-5 w-px bg-zinc-700" />
@@ -298,7 +314,7 @@ export function ReaderToolbar({
 
           <button
             onClick={handleZoomOut}
-            disabled={typeof scale === 'number' && scale <= SCALE_STEPS[0]}
+            disabled={scale <= SCALE_STEPS[0]}
             className="flex h-8 w-8 items-center justify-center rounded-lg
               text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
               disabled:opacity-40 disabled:cursor-not-allowed
@@ -327,7 +343,7 @@ export function ReaderToolbar({
 
           <button
             onClick={handleZoomIn}
-            disabled={typeof scale === 'number' && scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
+            disabled={scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
             className="flex h-8 w-8 items-center justify-center rounded-lg
               text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
               disabled:opacity-40 disabled:cursor-not-allowed
@@ -343,7 +359,7 @@ export function ReaderToolbar({
       <div className="flex items-center gap-0.5 sm:gap-1">
         {/* 颜色选择器（仅 canAnnotate 时显示） */}
         {canAnnotate && (
-          <div className="relative" ref={colorPickerRef}>
+          <div className="relative hidden sm:block" ref={colorPickerRef}>
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setColorPickerOpen((prev) => !prev)}
@@ -414,54 +430,23 @@ export function ReaderToolbar({
           <List size={18} weight="regular" />
         </button>
 
-        {/* 笔记面板切换 */}
+        {/* 批注 + 笔记面板切换 */}
         <button
-          onClick={onToggleAnnotationPanel}
+          onClick={onToggleSidePanel}
           className={`relative flex h-8 w-8 items-center justify-center rounded-lg
             transition-colors active:scale-[0.98]
-            ${annotationPanelOpen
+            ${sidePanelOpen
               ? 'bg-zinc-700 text-zinc-200'
               : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
             }`}
-          aria-label="批注管理"
-        >
-          <Highlighter size={18} weight="regular" />
-          {highlightCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center
-              rounded-full bg-[var(--color-accent)] px-1 text-[10px] font-medium text-white">
-              {highlightCount}
-            </span>
-          )}
-        </button>
-
-        {/* 页面笔记切换 */}
-        <button
-          onClick={onToggleNotePanel}
-          className={`relative flex h-8 w-8 items-center justify-center rounded-lg
-            transition-colors active:scale-[0.98]
-            ${
-              notePanelOpen
-                ? 'bg-zinc-700 text-zinc-200'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-            }`}
-          aria-label="笔记面板"
+          aria-label="批注与笔记"
         >
           <NotePencil size={18} weight="regular" />
-          {noteCount > 0 && (
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{
-                type: 'spring',
-                stiffness: 300,
-                damping: 15,
-              }}
-              className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center
-                rounded-full bg-[var(--color-accent)] px-1
-                text-[10px] font-medium text-white"
-            >
-              {noteCount}
-            </motion.span>
+          {(highlightCount + noteCount) > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center
+              rounded-full bg-[var(--color-accent)] px-1 text-[10px] font-medium text-white">
+              {highlightCount + noteCount}
+            </span>
           )}
         </button>
 
@@ -536,37 +521,30 @@ export function ReaderToolbar({
                   </button>
                 </div>
 
-                {/* 缩放控制 */}
+                {/* 高亮颜色（仅 canAnnotate） */}
+                {canAnnotate && (
+                <>
                 <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-2">
-                  缩放
+                  高亮颜色
                 </p>
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    onClick={handleZoomOut}
-                    disabled={typeof scale === 'number' && scale <= SCALE_STEPS[0]}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg
-                      text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700
-                      disabled:opacity-40 disabled:cursor-not-allowed
-                      transition-colors active:scale-[0.98]"
-                    aria-label="缩小"
-                  >
-                    <MagnifyingGlassMinus size={16} weight="regular" />
-                  </button>
-                  <span className="text-xs text-zinc-300 tabular-nums flex-1 text-center">
-                    {scaleLabel(scale)}
-                  </span>
-                  <button
-                    onClick={handleZoomIn}
-                    disabled={typeof scale === 'number' && scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg
-                      text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700
-                      disabled:opacity-40 disabled:cursor-not-allowed
-                      transition-colors active:scale-[0.98]"
-                    aria-label="放大"
-                  >
-                    <MagnifyingGlassPlus size={16} weight="regular" />
-                  </button>
+                <div className="flex items-center gap-1.5 mb-1">
+                  {HIGHLIGHT_COLORS.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => onColorChange(color.value)}
+                      className="relative flex h-7 w-7 items-center justify-center rounded-full
+                        transition-transform hover:scale-110 active:scale-95"
+                      style={{ backgroundColor: color.value }}
+                      aria-label={color.name}
+                    >
+                      {activeColor === color.value && (
+                        <Check size={12} weight="bold" className="text-zinc-800" />
+                      )}
+                    </button>
+                  ))}
                 </div>
+                </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

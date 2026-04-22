@@ -19,7 +19,8 @@ interface AnnotationPanelProps {
   onDelete: (id: string) => void
   onUpdateComment: (id: string, comment: string) => void
   onScrollTo: (id: string) => void
-  onClose: () => void
+  onClose?: () => void
+  embedded?: boolean
 }
 
 type FilterType = 'all' | 'with-comment' | 'no-comment'
@@ -31,6 +32,7 @@ export function AnnotationPanel({
   onUpdateComment,
   onScrollTo,
   onClose,
+  embedded,
 }: AnnotationPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
@@ -83,9 +85,10 @@ export function AnnotationPanel({
   }, [editingId, editContent, onUpdateComment])
 
   return (
-    <div className="shrink-0 border-l border-zinc-700/50 bg-zinc-900 overflow-hidden
-      w-full sm:w-auto absolute sm:relative inset-0 sm:inset-auto z-30 sm:z-auto">
-      <div className="flex h-full w-full sm:w-[320px] flex-col">
+    <div className={embedded ? 'flex h-full flex-col overflow-hidden' :
+      `shrink-0 border-l border-zinc-700/50 bg-zinc-900 overflow-hidden
+      w-full sm:w-auto absolute sm:relative inset-0 sm:inset-auto z-30 sm:z-auto`}>
+      <div className={embedded ? 'flex h-full flex-col' : 'flex h-full w-full sm:w-[320px] flex-col'}>
         {/* 头部 */}
         <div className="shrink-0 border-b border-zinc-700/50 px-3 py-2 space-y-2">
           <div className="flex items-center justify-between">
@@ -101,6 +104,7 @@ export function AnnotationPanel({
               >
                 <Funnel size={13} weight={hasActiveFilter ? 'fill' : 'regular'} />
               </button>
+              {!embedded && onClose && (
               <button
                 onClick={onClose}
                 className="flex h-6 w-6 items-center justify-center rounded-md
@@ -109,6 +113,7 @@ export function AnnotationPanel({
               >
                 <X size={14} weight="bold" />
               </button>
+              )}
             </div>
           </div>
 

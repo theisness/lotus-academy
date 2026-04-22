@@ -18,7 +18,7 @@ import type {
   ScaledPosition,
   PdfScaleValue,
 } from 'react-pdf-highlighter-extended'
-import { SpinnerGap, WarningCircle, CaretLeft, CaretRight } from '@phosphor-icons/react'
+import { SpinnerGap, WarningCircle, CaretLeft, CaretRight, X } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { useAnnotations } from '@/hooks/useAnnotations'
 import type { AnnotationPosition } from '@/types/database'
@@ -102,10 +102,10 @@ export function PdfReader({
     }
     return DEFAULT_COLOR
   })
-  const [notePanelOpen, setNotePanelOpen] = useState(false)
+  const [sidePanelOpen, setSidePanelOpen] = useState(false)
+  const [sidePanelTab, setSidePanelTab] = useState<'annotations' | 'notes'>('annotations')
   const [isLoading, setIsLoading] = useState(true)
   const [outlineOpen, setOutlineOpen] = useState(false)
-  const [annotationPanelOpen, setAnnotationPanelOpen] = useState(false)
   const pdfDocumentRef = useRef<import('pdfjs-dist').PDFDocumentProxy | null>(null)
 
   /** 翻页方式：scroll（滚动）、page（单屏切换） */
@@ -355,6 +355,10 @@ export function PdfReader({
     setScale(newScale)
   }, [])
 
+  /** 获取 viewer 当前实际缩放比例（用于 toolbar 显示和步进计算） */
+  const actualScale = typeof scale === 'number' ? scale
+    : (highlighterUtilsRef.current?.getViewer()?.currentScale ?? 1.0)
+
   /**
    * 切换阅读模式
    */
@@ -365,7 +369,13 @@ export function PdfReader({
     viewer.scrollMode = scroll === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
     viewer.spreadMode = display === 'double' ? SpreadMode.ODD : SpreadMode.NONE
     if (scroll === 'page' || display === 'double') {
-      setScale(display === 'double' ? 'page-fit' : 'page-width')
+      const fitMode = display === 'double' ? 'page-fit' : 'page-width'
+      setScale(fitMode)
+      // viewer 异步应用缩放后，读取实际数值同步到 toolbar
+      requestAnimationFrame(() => {
+        const actual = viewer.currentScale
+        if (actual) setScale(actual)
+      })
     }
   }, [])
 
@@ -388,21 +398,19 @@ export function PdfReader({
         bookTitle={bookTitle}
         currentPage={currentPage}
         totalPages={totalPages}
-        scale={scale}
+        scale={actualScale}
         canAnnotate={canAnnotate}
         activeColor={activeColor}
-        notePanelOpen={notePanelOpen}
+        sidePanelOpen={sidePanelOpen}
+        onToggleSidePanel={() => setSidePanelOpen((prev) => !prev)}
         noteCount={allNotes.length}
+        highlightCount={highlights.length}
         onBack={onBack}
         onPageChange={handlePageChange}
         onScaleChange={handleScaleChange}
         onColorChange={handleColorChange}
-        onToggleNotePanel={() => { setNotePanelOpen((prev) => !prev); setAnnotationPanelOpen(false) }}
         outlineOpen={outlineOpen}
         onToggleOutline={() => setOutlineOpen((prev) => !prev)}
-        annotationPanelOpen={annotationPanelOpen}
-        onToggleAnnotationPanel={() => { setAnnotationPanelOpen((prev) => !prev); setNotePanelOpen(false) }}
-        highlightCount={highlights.length}
         scrollType={scrollType}
         displayMode={displayMode}
         onScrollTypeChange={handleScrollTypeChange}
@@ -526,56 +534,87 @@ export function PdfReader({
 
           {/* 边缘翻页箭头（仅在单屏切换模式显示） */}
           {scrollType === 'page' && (
-            <>
-              <div className="absolute left-0 top-0 bottom-0 w-16 z-20 group flex items-center justify-start pl-2">
+            <div className="absolute inset-0 z-20 group pointer-events-none">
+              <div className="absolute left-0 top-0 bottom-0 w-24 flex items-center justify-start pl-3">
                 <button
                   onClick={handlePrevPage}
                   disabled={currentPage <= 1}
-                  className="p-2 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
+                  className="p-3 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
                     opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                    disabled:opacity-0 disabled:cursor-not-allowed"
+                    disabled:opacity-0 disabled:cursor-not-allowed pointer-events-auto"
                 >
-                  <CaretLeft size={20} className="text-zinc-400" />
+                  <CaretLeft size={28} className="text-zinc-300" />
                 </button>
               </div>
-              <div className="absolute right-0 top-0 bottom-0 w-16 z-20 group flex items-center justify-end pr-2">
+              <div className="absolute right-0 top-0 bottom-0 w-24 flex items-center justify-end pr-3">
                 <button
                   onClick={handleNextPage}
                   disabled={currentPage >= totalPages}
-                  className="p-2 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
+                  className="p-3 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
                     opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                    disabled:opacity-0 disabled:cursor-not-allowed"
+                    disabled:opacity-0 disabled:cursor-not-allowed pointer-events-auto"
                 >
-                  <CaretRight size={20} className="text-zinc-400" />
+                  <CaretRight size={28} className="text-zinc-300" />
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
 
-        {/* 笔记面板 */}
-        {notePanelOpen && (
-          <NotePanel
-            notes={allNotes}
-            currentPage={currentPage}
-            canAnnotate={canAnnotate}
-            onAddNote={handleAddNote}
-            onUpdateNote={handleUpdateNote}
-            onDeleteNote={handleDeleteNote}
-            onClose={() => setNotePanelOpen(false)}
-          />
-        )}
-
-        {/* 批注管理面板 */}
-        {annotationPanelOpen && (
-          <AnnotationPanel
-            annotations={annotations}
-            canAnnotate={canAnnotate}
-            onDelete={handleDeleteHighlight}
-            onUpdateComment={handleUpdateComment}
-            onScrollTo={handleScrollToHighlight}
-            onClose={() => setAnnotationPanelOpen(false)}
-          />
+        {/* 侧边面板（批注 + 笔记 tab 切换） */}
+        {sidePanelOpen && (
+          <div className="shrink-0 border-l border-zinc-700/50 bg-zinc-900 overflow-hidden
+            w-full sm:w-auto absolute sm:relative inset-0 sm:inset-auto z-30 sm:z-auto">
+            <div className="flex h-full w-full sm:w-[320px] flex-col">
+              {/* Tab 头 */}
+              <div className="flex items-center border-b border-zinc-700/50">
+                <button
+                  onClick={() => setSidePanelTab('annotations')}
+                  className={`flex-1 py-2 text-xs font-medium text-center transition-colors
+                    ${sidePanelTab === 'annotations' ? 'text-zinc-200 border-b-2 border-[var(--color-accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  批注 {highlights.length > 0 && `(${highlights.length})`}
+                </button>
+                <button
+                  onClick={() => setSidePanelTab('notes')}
+                  className={`flex-1 py-2 text-xs font-medium text-center transition-colors
+                    ${sidePanelTab === 'notes' ? 'text-zinc-200 border-b-2 border-[var(--color-accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  笔记 {allNotes.length > 0 && `(${allNotes.length})`}
+                </button>
+                <button
+                  onClick={() => setSidePanelOpen(false)}
+                  className="p-2 text-zinc-500 hover:text-zinc-300"
+                  aria-label="关闭"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              {/* Tab 内容 */}
+              <div className="flex-1 overflow-hidden">
+                {sidePanelTab === 'annotations' ? (
+                  <AnnotationPanel
+                    annotations={annotations}
+                    canAnnotate={canAnnotate}
+                    onDelete={handleDeleteHighlight}
+                    onUpdateComment={handleUpdateComment}
+                    onScrollTo={handleScrollToHighlight}
+                    embedded
+                  />
+                ) : (
+                  <NotePanel
+                    notes={allNotes}
+                    currentPage={currentPage}
+                    canAnnotate={canAnnotate}
+                    onAddNote={handleAddNote}
+                    onUpdateNote={handleUpdateNote}
+                    onDeleteNote={handleDeleteNote}
+                    embedded
+                  />
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

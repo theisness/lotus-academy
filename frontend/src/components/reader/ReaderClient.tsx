@@ -30,6 +30,39 @@ const springTransition = {
   damping: 20,
 }
 
+/** 简易 IndexedDB 缓存：避免每次打开都重新下载 PDF */
+const PDF_CACHE_DB = 'lotus-pdf-cache'
+const PDF_CACHE_STORE = 'files'
+
+function openCacheDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(PDF_CACHE_DB, 1)
+    req.onupgradeneeded = () => req.result.createObjectStore(PDF_CACHE_STORE)
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function getCachedPdf(key: string): Promise<Blob | null> {
+  try {
+    const db = await openCacheDB()
+    return new Promise((resolve) => {
+      const tx = db.transaction(PDF_CACHE_STORE, 'readonly')
+      const req = tx.objectStore(PDF_CACHE_STORE).get(key)
+      req.onsuccess = () => resolve(req.result ?? null)
+      req.onerror = () => resolve(null)
+    })
+  } catch { return null }
+}
+
+async function setCachedPdf(key: string, blob: Blob) {
+  try {
+    const db = await openCacheDB()
+    const tx = db.transaction(PDF_CACHE_STORE, 'readwrite')
+    tx.objectStore(PDF_CACHE_STORE).put(blob, key)
+  } catch { /* 静默 */ }
+}
+
 interface ReaderClientProps {
   bookId: string
 }
