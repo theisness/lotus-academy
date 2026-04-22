@@ -234,29 +234,6 @@ export function ReaderToolbar({
         </button>
 
         {/* 移动端缩放按钮 — 直接显示在工具栏 */}
-        <div className="flex sm:hidden items-center gap-0.5">
-          <button
-            onPointerUp={handleZoomOut}
-            disabled={scale <= SCALE_STEPS[0]}
-            className="flex h-8 w-8 items-center justify-center rounded-lg
-              text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
-              disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="缩小"
-          >
-            <MagnifyingGlassMinus size={16} />
-          </button>
-          <span className="text-[11px] text-zinc-400 tabular-nums w-9 text-center">{scaleLabel(scale)}</span>
-          <button
-            onPointerUp={handleZoomIn}
-            disabled={scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
-            className="flex h-8 w-8 items-center justify-center rounded-lg
-              text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
-              disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="放大"
-          >
-            <MagnifyingGlassPlus size={16} />
-          </button>
-        </div>
 
         {/* 翻页方式 + 显示方式 — 仅桌面端显示 */}
         <div className="hidden sm:flex items-center gap-0.5">
@@ -521,8 +498,35 @@ export function ReaderToolbar({
                   </button>
                 </div>
 
-                {/* 高亮颜色（仅 canAnnotate） */}
-                {canAnnotate && (
+                {/* 缩放 */}
+                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-2">
+                  缩放
+                </p>
+                <div className="flex items-center gap-2 mb-3">
+                  <button
+                    onPointerUp={handleZoomOut}
+                    disabled={scale <= SCALE_STEPS[0]}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg
+                      text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700
+                      disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="缩小"
+                  >
+                    <MagnifyingGlassMinus size={16} />
+                  </button>
+                  <span className="text-xs text-zinc-300 tabular-nums flex-1 text-center">{scaleLabel(scale)}</span>
+                  <button
+                    onPointerUp={handleZoomIn}
+                    disabled={scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg
+                      text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700
+                      disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="放大"
+                  >
+                    <MagnifyingGlassPlus size={16} />
+                  </button>
+                </div>
+
+                {/* 高亮颜色（仅 canAnnotate） */}                {canAnnotate && (
                 <>
                 <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-2">
                   高亮颜色

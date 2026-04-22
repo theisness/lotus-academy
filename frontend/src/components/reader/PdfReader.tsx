@@ -368,15 +368,11 @@ export function PdfReader({
     if (!viewer) return
     viewer.scrollMode = scroll === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
     viewer.spreadMode = display === 'double' ? SpreadMode.ODD : SpreadMode.NONE
-    if (scroll === 'page' || display === 'double') {
-      const fitMode = display === 'double' ? 'page-fit' : 'page-width'
-      setScale(fitMode)
-      // viewer 异步应用缩放后，读取实际数值同步到 toolbar
-      requestAnimationFrame(() => {
-        const actual = viewer.currentScale
-        if (actual) setScale(actual)
-      })
-    }
+    // 先用 string 让 viewer 自适应，然后立即读取实际数值锁定
+    const fitMode = display === 'double' ? 'page-fit' : 'page-width'
+    viewer.currentScaleValue = fitMode
+    // viewer 同步计算完成后 currentScale 已是实际数值
+    setScale(viewer.currentScale || 1.0)
   }, [])
 
   const handleScrollTypeChange = useCallback((type: 'scroll' | 'page') => {
@@ -498,7 +494,10 @@ export function PdfReader({
                   key={fileUrl}
                   pdfDocument={pdfDocument}
                   onTotalPages={setTotalPages}
-                  onLoadComplete={() => setIsLoading(false)}
+                  onLoadComplete={() => {
+                    setIsLoading(false)
+                    applyViewerModes(scrollType, displayMode)
+                  }}
                   highlights={highlights}
                   pdfScaleValue={scale}
                   onSelection={canAnnotate ? handleSelection : undefined}
@@ -511,6 +510,7 @@ export function PdfReader({
                         setCurrentPage(e.pageNumber)
                       })
                     }
+                    // 不在此处调用 applyViewerModes，等 onLoadComplete 后再应用
                   }}
                   selectionTip={canAnnotate ? (
                     <SelectionTip 
@@ -534,30 +534,30 @@ export function PdfReader({
 
           {/* 边缘翻页箭头（仅在单屏切换模式显示） */}
           {scrollType === 'page' && (
-            <div className="absolute inset-0 z-20 group pointer-events-none">
-              <div className="absolute left-0 top-0 bottom-0 w-24 flex items-center justify-start pl-3">
+            <>
+              <div className="absolute left-0 top-0 bottom-0 w-24 z-20 group flex items-center justify-start pl-3">
                 <button
                   onClick={handlePrevPage}
                   disabled={currentPage <= 1}
                   className="p-3 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
                     opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                    disabled:opacity-0 disabled:cursor-not-allowed pointer-events-auto"
+                    disabled:opacity-0 disabled:cursor-not-allowed"
                 >
                   <CaretLeft size={28} className="text-zinc-300" />
                 </button>
               </div>
-              <div className="absolute right-0 top-0 bottom-0 w-24 flex items-center justify-end pr-3">
+              <div className="absolute right-0 top-0 bottom-0 w-24 z-20 group flex items-center justify-end pr-3">
                 <button
                   onClick={handleNextPage}
                   disabled={currentPage >= totalPages}
                   className="p-3 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
                     opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                    disabled:opacity-0 disabled:cursor-not-allowed pointer-events-auto"
+                    disabled:opacity-0 disabled:cursor-not-allowed"
                 >
                   <CaretRight size={28} className="text-zinc-300" />
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
 
@@ -637,13 +637,15 @@ function PdfHighlighterWithPages({
   onTotalPages: (n: number) => void
   onLoadComplete?: () => void
 }) {
+  const onLoadCompleteRef = useRef(onLoadComplete)
+  onLoadCompleteRef.current = onLoadComplete
+
   useEffect(() => {
     onTotalPages(pdfDocument.numPages)
-    // PDF 文档已加载，通知父组件
-    if (onLoadComplete) {
-      onLoadComplete()
+    if (onLoadCompleteRef.current) {
+      onLoadCompleteRef.current()
     }
-  }, [pdfDocument, onTotalPages, onLoadComplete])
+  }, [pdfDocument, onTotalPages])
 
   return (
     <PdfHighlighter
