@@ -92,7 +92,7 @@ export function PdfReader({
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [scale, setScale] = useState<PdfScaleValue>(1.0)
+  const [scale, setScale] = useState<PdfScaleValue>('page-width')
   const [activeColor, setActiveColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(COLOR_STORAGE_KEY)
@@ -106,6 +106,7 @@ export function PdfReader({
   const [sidePanelTab, setSidePanelTab] = useState<'annotations' | 'notes'>('annotations')
   const [isLoading, setIsLoading] = useState(true)
   const [outlineOpen, setOutlineOpen] = useState(false)
+  const [mobileArrowsVisible, setMobileArrowsVisible] = useState(true)
   const pdfDocumentRef = useRef<import('pdfjs-dist').PDFDocumentProxy | null>(null)
 
   /** 翻页方式：scroll（滚动）、page（单屏切换） */
@@ -368,11 +369,12 @@ export function PdfReader({
     if (!viewer) return
     viewer.scrollMode = scroll === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
     viewer.spreadMode = display === 'double' ? SpreadMode.ODD : SpreadMode.NONE
-    // 先用 string 让 viewer 自适应，然后立即读取实际数值锁定
     const fitMode = display === 'double' ? 'page-fit' : 'page-width'
-    viewer.currentScaleValue = fitMode
-    // viewer 同步计算完成后 currentScale 已是实际数值
-    setScale(viewer.currentScale || 1.0)
+    // 先设 string 让 viewer 自适应，再锁定为数值
+    setScale(fitMode)
+    setTimeout(() => {
+      if (viewer.currentScale) setScale(viewer.currentScale)
+    }, 100)
   }, [])
 
   const handleScrollTypeChange = useCallback((type: 'scroll' | 'page') => {
@@ -429,7 +431,10 @@ export function PdfReader({
         )}
 
         {/* PDF 阅读器 */}
-        <div className="relative flex-1 overflow-auto">
+        <div
+          className={`relative flex-1 overflow-auto${scrollType === 'page' ? ' pdf-page-mode' : ''}`}
+          onPointerUp={() => { if (mobileArrowsVisible) setMobileArrowsVisible(false) }}
+        >
           {/* 加载指示器 - 始终显示直到 PDF 加载完成 */}
           {isLoading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-900">
@@ -496,7 +501,16 @@ export function PdfReader({
                   onTotalPages={setTotalPages}
                   onLoadComplete={() => {
                     setIsLoading(false)
-                    applyViewerModes(scrollType, displayMode)
+                    const viewer = highlighterUtilsRef.current?.getViewer()
+                    if (viewer) {
+                      viewer.scrollMode = scrollType === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
+                      viewer.spreadMode = displayMode === 'double' ? SpreadMode.ODD : SpreadMode.NONE
+                    }
+                    // 等 viewer 完成自适应布局后，锁定为数值防止后续重复自适应
+                    setTimeout(() => {
+                      const v = highlighterUtilsRef.current?.getViewer()
+                      if (v?.currentScale) setScale(v.currentScale)
+                    }, 100)
                   }}
                   highlights={highlights}
                   pdfScaleValue={scale}
@@ -535,24 +549,34 @@ export function PdfReader({
           {/* 边缘翻页箭头（仅在单屏切换模式显示） */}
           {scrollType === 'page' && (
             <>
-              <div className="absolute left-0 top-0 bottom-0 w-24 z-20 group flex items-center justify-start pl-3">
+              <div
+                className="absolute left-0 top-0 bottom-0 w-24 z-20 group flex items-center justify-start pl-3"
+                onPointerUp={(e) => {
+                  if (!mobileArrowsVisible) { e.stopPropagation(); setMobileArrowsVisible(true) }
+                }}
+              >
                 <button
-                  onClick={handlePrevPage}
+                  onPointerUp={(e) => { e.stopPropagation(); handlePrevPage() }}
                   disabled={currentPage <= 1}
-                  className="p-3 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
-                    opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                    disabled:opacity-0 disabled:cursor-not-allowed"
+                  className={`p-3 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
+                    ${mobileArrowsVisible ? 'opacity-60' : 'opacity-0'} sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300
+                    disabled:opacity-0 disabled:cursor-not-allowed`}
                 >
                   <CaretLeft size={28} className="text-zinc-300" />
                 </button>
               </div>
-              <div className="absolute right-0 top-0 bottom-0 w-24 z-20 group flex items-center justify-end pr-3">
+              <div
+                className="absolute right-0 top-0 bottom-0 w-24 z-20 group flex items-center justify-end pr-3"
+                onPointerUp={(e) => {
+                  if (!mobileArrowsVisible) { e.stopPropagation(); setMobileArrowsVisible(true) }
+                }}
+              >
                 <button
-                  onClick={handleNextPage}
+                  onPointerUp={(e) => { e.stopPropagation(); handleNextPage() }}
                   disabled={currentPage >= totalPages}
-                  className="p-3 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
-                    opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                    disabled:opacity-0 disabled:cursor-not-allowed"
+                  className={`p-3 rounded-full bg-zinc-800/40 hover:bg-zinc-800/70
+                    ${mobileArrowsVisible ? 'opacity-60' : 'opacity-0'} sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300
+                    disabled:opacity-0 disabled:cursor-not-allowed`}
                 >
                   <CaretRight size={28} className="text-zinc-300" />
                 </button>

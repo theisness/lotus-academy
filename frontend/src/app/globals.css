@@ -84,3 +84,12 @@ body {
 .PdfHighlighter ::selection {
   background-color: transparent;
 }
+
+
+/* 单屏翻页模式下页面垂直居中 */
+.pdf-page-mode .PdfHighlighter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+}

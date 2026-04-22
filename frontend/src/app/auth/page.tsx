@@ -96,7 +96,7 @@ export default function AuthPage() {
               setErrors({ general: errorMsg })
             }
           } else {
-            setRegisterSuccess(true)
+            router.push('/bookshelf')
           }
         }
       } catch {
