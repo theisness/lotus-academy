@@ -1,8 +1,9 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import React from 'react'
 import { GlobalWorkerOptions } from 'pdfjs-dist'
+import { ScrollMode, SpreadMode } from 'pdfjs-dist/web/pdf_viewer.mjs'
 import {
   PdfLoader,
   PdfHighlighter,
@@ -99,6 +100,17 @@ export function PdfReader({
   })
   const [notePanelOpen, setNotePanelOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+
+  /** 阅读模式：scroll（滚动）、single（单页）、spread（双页） */
+  const [viewMode, setViewMode] = useState<'scroll' | 'single' | 'spread'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('reader-view-mode')
+      if (saved === 'scroll' || saved === 'single' || saved === 'spread') {
+        return saved
+      }
+    }
+    return 'scroll'
+  })
 
   /** 切换颜色并持久化到 localStorage */
   const handleColorChange = useCallback((color: string) => {
@@ -275,6 +287,31 @@ export function PdfReader({
     setScale(newScale)
   }, [])
 
+  /**
+   * 切换阅读模式
+   */
+  const handleViewModeChange = useCallback((mode: 'scroll' | 'single' | 'spread') => {
+    setViewMode(mode)
+    try {
+      localStorage.setItem('reader-view-mode', mode)
+    } catch {
+      // 静默处理
+    }
+    const viewer = highlighterUtilsRef.current?.getViewer()
+    if (viewer) {
+      if (mode === 'scroll') {
+        viewer.scrollMode = ScrollMode.VERTICAL
+        viewer.spreadMode = SpreadMode.NONE
+      } else if (mode === 'single') {
+        viewer.scrollMode = ScrollMode.PAGE
+        viewer.spreadMode = SpreadMode.NONE
+      } else if (mode === 'spread') {
+        viewer.scrollMode = ScrollMode.PAGE
+        viewer.spreadMode = SpreadMode.ODD
+      }
+    }
+  }, [])
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900">
       {/* 工具栏 */}
@@ -292,6 +329,8 @@ export function PdfReader({
         onScaleChange={handleScaleChange}
         onColorChange={handleColorChange}
         onToggleNotePanel={() => setNotePanelOpen((prev) => !prev)}
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
       />
 
       {/* 主内容区 */}
@@ -357,6 +396,7 @@ export function PdfReader({
           >
             {(pdfDocument) => (
                 <PdfHighlighterWithPages
+                  key={fileUrl}
                   pdfDocument={pdfDocument}
                   onTotalPages={setTotalPages}
                   onLoadComplete={() => setIsLoading(false)}
@@ -423,7 +463,7 @@ function PdfHighlighterWithPages({
   return (
     <PdfHighlighter
       pdfDocument={pdfDocument}
-      style={{ height: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      style={{ height: '100%', width: '100%' }}
       {...props}
     >
       {children}
@@ -492,3 +532,10 @@ function HighlightContainer({
 
   return component
 }
+
+
+
+
+
+
+

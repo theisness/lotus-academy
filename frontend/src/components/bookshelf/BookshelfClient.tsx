@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -63,7 +63,9 @@ export function BookshelfClient() {
     error: booksError,
     searchBooks,
     uploadBook,
-    updateBook,
+updateBook,
+    deleteBook,
+    reorderBooks,
   } = useBooks('public')
   const { categories, loading: categoriesLoading, createCategory, updateCategory, deleteCategory, addBookToCategory, removeBookFromCategory } = useCategories('public')
 
@@ -194,7 +196,29 @@ export function BookshelfClient() {
     setEditingBookGroupTags([])
   }, [])
 
-  // --- Info dialog handlers (for non-admin users) ---
+
+  const handleDeleteBook = useCallback(
+    async (bookId: string) => {
+      try {
+        await deleteBook(bookId)
+      } catch (error) {
+        console.error('[BookshelfClient] Delete error:', error)
+        throw error
+      }
+    },
+    [deleteBook]
+  )
+
+  const handleReorderBooks = useCallback(
+    async (bookIds: string[]) => {
+      try {
+        await reorderBooks(bookIds)
+      } catch (error) {
+        console.error('[BookshelfClient] Reorder error:', error)
+      }
+    },
+    [reorderBooks]
+  )  // --- Info dialog handlers (for non-admin users) ---
 
   const handleInfoClick = useCallback((book: Book) => {
     setInfoBook(book)
@@ -541,6 +565,8 @@ export function BookshelfClient() {
           onBookClick={handleBookClick}
           onEditClick={isAdmin ? handleEditClick : undefined}
           onInfoClick={!isAdmin ? handleInfoClick : undefined}
+          onReorder={handleReorderBooks}
+          canReorder={isAdmin}
         />
       )}
 
@@ -552,7 +578,8 @@ export function BookshelfClient() {
           onClose={handleEditClose}
           onSave={handleEditSave}
           groupTags={editingBook.type === 'public' ? editingBookGroupTags : undefined}
-          onGroupTagsChange={editingBook.type === 'public' ? handleGroupTagsChange : undefined}
+onGroupTagsChange={editingBook.type === 'public' ? handleGroupTagsChange : undefined}
+          onDelete={handleDeleteBook}
         />
       )}
 
@@ -583,3 +610,9 @@ export function BookshelfClient() {
     </motion.div>
   )
 }
+
+
+
+
+
+

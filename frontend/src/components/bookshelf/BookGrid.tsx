@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, PencilSimple, Info } from '@phosphor-icons/react'
+import { BookOpen, PencilSimple, Info, DotsThreeVertical } from '@phosphor-icons/react'
 import type { BookGridProps } from '@/types/components'
 import type { Book } from '@/types/database'
 
@@ -12,6 +13,7 @@ import type { Book } from '@/types/database'
  * 使用 staggerChildren 实现网格项入场动画。
  * 包含骨架屏加载状态、空状态。
  * 支持可选的编辑按钮（hover 时显示在封面右上角）。
+ * 支持拖拽排序（通过 onReorder 回调）。
  */
 
 const springTransition = {
@@ -143,17 +145,44 @@ function BookCard({
   onClick,
   onEditClick,
   onInfoClick,
+  draggable,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  isDragging,
+  isDragOver,
 }: {
   book: Book
   onClick: (book: Book) => void
   onEditClick?: (book: Book) => void
   onInfoClick?: (book: Book) => void
+  draggable?: boolean
+  onDragStart?: () => void
+  onDragOver?: (e: React.DragEvent) => void
+  onDragEnd?: () => void
+  isDragging?: boolean
+  isDragOver?: boolean
 }) {
   return (
     <motion.div
       variants={itemVariants}
-      className="group relative"
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      className={`group relative ${isDragging ? 'opacity-50 scale-95' : ''} ${isDragOver ? 'ring-2 ring-[var(--color-accent)] rounded-lg' : ''}`}
     >
+      {/* Drag handle */}
+      {draggable && (
+        <div
+          className="absolute top-2 left-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg
+            bg-[var(--color-surface)]/80 backdrop-blur-sm border border-[var(--color-border)]
+            text-[var(--color-text-muted)] cursor-grab active:cursor-grabbing
+            opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <DotsThreeVertical size={14} weight="bold" />
+        </div>
+      )}
       <button
         type="button"
         onClick={() => onClick(book)}
@@ -207,15 +236,13 @@ function BookCard({
               text-[var(--color-text-muted)]
               transition-all duration-200
               hover:bg-[var(--color-surface)] hover:text-[var(--color-accent)]
-              active:scale-[0.98]
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-            aria-label="查看书籍详情"
+              active:scale-[0.98]"
+            aria-label="书籍信息"
           >
-            <Info size={16} weight="bold" />
+            <Info size={16} weight="regular" />
           </button>
         )}
-        
-        {/* Edit button — for admin users */}
+        {/* Edit button — for admins */}
         {onEditClick && (
           <button
             type="button"
@@ -229,11 +256,10 @@ function BookCard({
               text-[var(--color-text-muted)]
               transition-all duration-200
               hover:bg-[var(--color-surface)] hover:text-[var(--color-accent)]
-              active:scale-[0.98]
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-            aria-label="编辑书籍信息"
+              active:scale-[0.98]"
+            aria-label="编辑书籍"
           >
-            <PencilSimple size={16} weight="bold" />
+            <PencilSimple size={16} weight="regular" />
           </button>
         )}
       </div>
@@ -241,13 +267,38 @@ function BookCard({
   )
 }
 
-export function BookGrid({ books, columns, loading, onBookClick, onEditClick, onInfoClick }: BookGridProps) {
+export function BookGrid({ books, columns, loading, onBookClick, onEditClick, onInfoClick, onReorder, canReorder }: BookGridProps) {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
   if (loading) {
     return <BookGridSkeleton columns={columns} />
   }
 
   if (books.length === 0) {
     return <BookGridEmpty />
+  }
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index)
+    }
+  }
+
+  const handleDragEnd = () => {
+    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex && onReorder) {
+      const newOrder = [...books]
+      const [draggedBook] = newOrder.splice(draggedIndex, 1)
+      newOrder.splice(dragOverIndex, 0, draggedBook)
+      onReorder(newOrder.map(b => b.id))
+    }
+    setDraggedIndex(null)
+    setDragOverIndex(null)
   }
 
   return (
@@ -258,13 +309,19 @@ export function BookGrid({ books, columns, loading, onBookClick, onEditClick, on
       animate="visible"
       key={books.map((b) => b.id).join(',')}
     >
-      {books.map((book) => (
+      {books.map((book, index) => (
         <BookCard
           key={book.id}
           book={book}
           onClick={onBookClick}
           onEditClick={onEditClick}
           onInfoClick={onInfoClick}
+          draggable={canReorder}
+          onDragStart={() => handleDragStart(index)}
+          onDragOver={(e) => handleDragOver(e, index)}
+          onDragEnd={handleDragEnd}
+          isDragging={draggedIndex === index}
+          isDragOver={dragOverIndex === index}
         />
       ))}
     </motion.div>

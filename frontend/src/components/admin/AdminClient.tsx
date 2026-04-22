@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
@@ -15,6 +15,7 @@ import {
   X,
   Calendar,
   IdentificationBadge,
+  Envelope,
 } from '@phosphor-icons/react'
 import { useUserManagement } from '@/hooks/useUserManagement'
 import { useAuthContext } from '@/components/providers/AuthProvider'
@@ -688,6 +689,11 @@ function UserDetailDialog({
             {/* Detail fields */}
             <div className="mt-5 w-full space-y-3">
               <DetailRow
+                icon={<Envelope size={15} weight="regular" />}
+                label="邮箱"
+                value={user.email || '未设置'}
+              />
+              <DetailRow
                 icon={<IdentificationBadge size={15} weight="regular" />}
                 label="用户 ID"
                 value={user.id}
@@ -758,3 +764,4 @@ function DetailRow({
     </div>
   )
 }
+

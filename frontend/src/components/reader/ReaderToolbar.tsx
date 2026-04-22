@@ -12,6 +12,9 @@ import {
   NotePencil,
   Check,
   DotsThree,
+  BookOpenText,
+  BookOpen,
+  Columns,
 } from '@phosphor-icons/react'
 import { HIGHLIGHT_COLORS } from './PdfReader'
 
@@ -21,6 +24,7 @@ import { HIGHLIGHT_COLORS } from './PdfReader'
  * 提供：
  * - 返回按钮 + 书籍标题
  * - 翻页控制（上一页/下一页/页码跳转）
+ * - 翻页模式切换（滚动/单页/双页）
  * - 缩放控制（缩小/放大）
  * - 批注工具（颜色选择器，仅 canAnnotate 时显示）
  * - 笔记面板切换按钮
@@ -50,6 +54,8 @@ interface ReaderToolbarProps {
   onScaleChange: (scale: number) => void
   onColorChange: (color: string) => void
   onToggleNotePanel: () => void
+  viewMode: 'scroll' | 'single' | 'spread'
+  onViewModeChange: (mode: 'scroll' | 'single' | 'spread') => void
 }
 
 const SCALE_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
@@ -68,6 +74,8 @@ export function ReaderToolbar({
   onScaleChange,
   onColorChange,
   onToggleNotePanel,
+  viewMode,
+  onViewModeChange,
 }: ReaderToolbarProps) {
   const [pageInput, setPageInput] = useState(String(currentPage))
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -156,7 +164,7 @@ export function ReaderToolbar({
         </span>
       </div>
 
-      {/* 中间：翻页 + 缩放（缩放仅桌面端显示） */}
+      {/* 中间：翻页 + 翻页模式 + 缩放 */}
       <div className="flex items-center gap-0.5 sm:gap-1">
         {/* 翻页 */}
         <button
@@ -204,6 +212,41 @@ export function ReaderToolbar({
         >
           <CaretRight size={16} weight="bold" />
         </button>
+
+        {/* 翻页模式切换 — 仅桌面端显示 */}
+        <div className="hidden sm:flex items-center gap-0.5">
+          <div className="mx-1 h-5 w-px bg-zinc-700" />
+          <button
+            onClick={() => onViewModeChange('scroll')}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg
+              transition-colors active:scale-[0.98]
+              ${viewMode === 'scroll' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+            aria-label="滚动模式"
+            title="滚动"
+          >
+            <BookOpenText size={16} weight={viewMode === 'scroll' ? 'fill' : 'regular'} />
+          </button>
+          <button
+            onClick={() => onViewModeChange('single')}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg
+              transition-colors active:scale-[0.98]
+              ${viewMode === 'single' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+            aria-label="单页模式"
+            title="单页"
+          >
+            <BookOpen size={16} weight={viewMode === 'single' ? 'fill' : 'regular'} />
+          </button>
+          <button
+            onClick={() => onViewModeChange('spread')}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg
+              transition-colors active:scale-[0.98]
+              ${viewMode === 'spread' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+            aria-label="双页模式"
+            title="双页"
+          >
+            <Columns size={16} weight={viewMode === 'spread' ? 'fill' : 'regular'} />
+          </button>
+        </div>
 
         {/* 缩放控制 — 仅桌面端显示 */}
         <div className="hidden sm:flex items-center gap-1">
@@ -329,7 +372,7 @@ export function ReaderToolbar({
           )}
         </button>
 
-        {/* 移动端溢出菜单（缩放控制） */}
+        {/* 移动端溢出菜单（缩放控制 + 翻页模式） */}
         <div className="relative sm:hidden" ref={overflowRef}>
           <button
             onClick={() => setMobileOverflowOpen((prev) => !prev)}
@@ -352,6 +395,40 @@ export function ReaderToolbar({
                   rounded-lg bg-zinc-800 border border-zinc-700 p-3 shadow-xl
                   min-w-[180px]"
               >
+                {/* 翻页模式 */}
+                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-2">
+                  翻页模式
+                </p>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <button
+                    onClick={() => onViewModeChange('scroll')}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg
+                      transition-colors active:scale-[0.98]
+                      ${viewMode === 'scroll' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
+                    aria-label="滚动模式"
+                  >
+                    <BookOpenText size={16} weight={viewMode === 'scroll' ? 'fill' : 'regular'} />
+                  </button>
+                  <button
+                    onClick={() => onViewModeChange('single')}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg
+                      transition-colors active:scale-[0.98]
+                      ${viewMode === 'single' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
+                    aria-label="单页模式"
+                  >
+                    <BookOpen size={16} weight={viewMode === 'single' ? 'fill' : 'regular'} />
+                  </button>
+                  <button
+                    onClick={() => onViewModeChange('spread')}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg
+                      transition-colors active:scale-[0.98]
+                      ${viewMode === 'spread' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}`}
+                    aria-label="双页模式"
+                  >
+                    <Columns size={16} weight={viewMode === 'spread' ? 'fill' : 'regular'} />
+                  </button>
+                </div>
+
                 {/* 缩放控制 */}
                 <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 mb-2">
                   缩放

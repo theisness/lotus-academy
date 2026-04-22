@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback, useRef, useEffect, type KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -40,7 +40,8 @@ export function BookEditDialog({
   onClose,
   onSave,
   groupTags,
-  onGroupTagsChange,
+onGroupTagsChange,
+  onDelete,
 }: BookEditDialogProps) {
   const [coverUrl, setCoverUrl] = useState(book.cover_url ?? '')
   const [title, setTitle] = useState(book.title)
@@ -53,7 +54,9 @@ export function BookEditDialog({
   const [coverError, setCoverError] = useState('')
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
-  const [showTagSuggestions, setShowTagSuggestions] = useState(false)
+const [showTagSuggestions, setShowTagSuggestions] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const coverInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
@@ -249,6 +252,20 @@ export function BookEditDialog({
     [groupTags, onGroupTagsChange]
   )
 
+
+  const handleDelete = useCallback(async () => {
+    if (!onDelete) return
+    setDeleting(true)
+    try {
+      await onDelete(book.id)
+      onClose()
+    } catch {
+      // 静默处理
+    } finally {
+      setDeleting(false)
+      setShowDeleteConfirm(false)
+    }
+  }, [onDelete, book.id, onClose])
   return (
     <AnimatePresence>
       {open && (
@@ -608,7 +625,72 @@ export function BookEditDialog({
             )}
 
             {/* Footer buttons */}
-            <div className="flex items-center justify-end gap-3 px-6 pb-6 pt-2">
+            <div className="flex items-center justify-between gap-3 px-6 pb-6 pt-2">
+              {/* Delete button */}
+              {onDelete && (
+                <div className="relative">
+                  {!showDeleteConfirm ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      disabled={saving || deleting}
+                      className="inline-flex items-center gap-2 rounded-lg
+                        border border-[var(--color-error)]/50
+                        bg-transparent px-3 py-2 text-sm font-medium
+                        text-[var(--color-error)] transition-colors
+                        hover:bg-[var(--color-error)]/10
+                        active:scale-[0.98]
+                        disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Trash size={16} weight="bold" />
+                      删除
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--color-text-muted)]">确认删除？</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(false)}
+                        disabled={deleting}
+                        className="rounded-lg border border-[var(--color-border)]
+                          bg-[var(--color-surface)] px-2 py-1 text-xs font-medium
+                          text-[var(--color-text-muted)] transition-colors
+                          hover:text-[var(--color-text)]
+                          active:scale-[0.98]
+                          disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="inline-flex items-center gap-1 rounded-lg
+                          bg-[var(--color-error)] px-2 py-1 text-xs font-medium text-white
+                          transition-colors
+                          active:scale-[0.98]
+                          disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deleting ? (
+                          <motion.span
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                            className="inline-flex"
+                          >
+                            <SpinnerGap size={12} />
+                          </motion.span>
+                        ) : (
+                          <Trash size={12} weight="bold" />
+                        )}
+                        {deleting ? '删除中...' : '确认'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Right side buttons */}
+              <div className="flex items-center gap-3 ml-auto">
               <button
                 type="button"
                 onClick={onClose}
@@ -645,6 +727,7 @@ export function BookEditDialog({
                 )}
                 {saving ? '保存中...' : '保存'}
               </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>
@@ -652,3 +735,8 @@ export function BookEditDialog({
     </AnimatePresence>
   )
 }
+
+
+
+
+

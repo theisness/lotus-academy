@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Hook 返回类型接口定义
  */
 
@@ -35,6 +35,7 @@ export interface UseBooksReturn {
   uploadBook: (file: File, metadata: BookMetadata) => Promise<Book>
   updateBook: (id: string, data: Partial<BookMetadata>) => Promise<void>
   deleteBook: (id: string) => Promise<void>
+  reorderBooks: (bookIds: string[]) => Promise<void>
 }
 
 /** useAnnotations Hook 返回类型 */
@@ -74,3 +75,4 @@ export interface UseUserManagementReturn {
   updateRole: (userId: string, role: 'admin' | 'user') => Promise<void>
   updateGroupTags: (userId: string, tags: string[]) => Promise<void>
 }
+

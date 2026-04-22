@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -240,7 +240,7 @@ export default function AuthPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                placeholder="your@email.com"
+                placeholder="请输入邮箱"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={handleEmailBlur}
@@ -412,7 +412,7 @@ export default function AuthPage() {
 
           <div className="grid grid-cols-3 gap-8 text-center">
             <div>
-              <p className="text-lg font-semibold text-[var(--color-text)]">PDF</p>
+              <p className="text-lg font-semibold text-[var(--color-text)]">PDF 阅读器</p>
               <p className="text-xs text-[var(--color-text-muted)]">在线阅读</p>
             </div>
             <div>
@@ -429,3 +429,5 @@ export default function AuthPage() {
     </div>
   )
 }
+
+

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -637,7 +637,7 @@ export default function ProfilePage() {
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="your@email.com"
+                    placeholder="请输入邮箱"
                     className="w-full rounded-lg border border-[var(--color-border)]
                       bg-[var(--color-surface)] py-2.5 pl-10 pr-4
                       text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]
@@ -890,3 +890,4 @@ export default function ProfilePage() {
     </motion.div>
   )
 }
+

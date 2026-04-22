@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 数据库模型类型定义
  * 对应 Supabase PostgreSQL 表结构
  */
@@ -27,6 +27,7 @@ export interface UserProfile {
   nickname: string | null
   avatar_url: string | null
   bio: string | null
+  email: string | null
   role: UserRole
   group_tags: string[]
   page_preference: PagePreference
@@ -47,6 +48,7 @@ export interface Book {
   type: ShelfType
   uploader_id: string
   published_date: string | null
+  sort_order: number
   created_at: string
   updated_at: string
 }
@@ -147,3 +149,5 @@ export interface UserMessage {
   is_read: boolean
   read_at: string | null
 }
+
+

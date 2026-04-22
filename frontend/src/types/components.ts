@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 组件 Props 类型定义
  */
 
@@ -13,6 +13,8 @@ export interface BookGridProps {
   onBookClick: (book: Book) => void
   onEditClick?: (book: Book) => void
   onInfoClick?: (book: Book) => void
+  onReorder?: (bookIds: string[]) => void
+  canReorder?: boolean
 }
 
 /** 栏目标签页组件 Props */
@@ -42,7 +44,8 @@ export interface BookEditDialogProps {
   onClose: () => void
   onSave: (data: Partial<BookMetadata>) => void
   groupTags?: string[]
-  onGroupTagsChange?: (tags: string[]) => void
+onGroupTagsChange?: (tags: string[]) => void
+  onDelete?: (bookId: string) => void
 }
 
 /** PDF 阅读器组件 Props */
@@ -78,3 +81,5 @@ export interface CategoryManagerProps {
   onAddBookToCategory: (categoryId: string, bookId: string) => Promise<void>
   onRemoveBookFromCategory: (categoryId: string, bookId: string) => Promise<void>
 }
+
+

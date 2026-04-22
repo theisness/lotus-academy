@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
@@ -38,7 +38,7 @@ export function useBooks(type: ShelfType): UseBooksReturn {
         .from('books')
         .select('*')
         .eq('type', type)
-        .order('created_at', { ascending: false })
+        .order('sort_order', { ascending: true })
 
       if (searchQuery.trim()) {
         query = query.ilike('title', `%${searchQuery.trim()}%`)
@@ -67,7 +67,7 @@ export function useBooks(type: ShelfType): UseBooksReturn {
             .from('books')
             .select('*')
             .eq('type', type)
-            .order('created_at', { ascending: false })
+            .order('sort_order', { ascending: true })
 
           if (searchQuery.trim()) {
             retryQuery = retryQuery.ilike('title', `%${searchQuery.trim()}%`)
@@ -247,6 +247,36 @@ export function useBooks(type: ShelfType): UseBooksReturn {
     [supabase, books]
   )
 
+
+  /**
+   * 重新排序书籍
+   * 批量更新书籍的 sort_order 字段
+   */
+  const reorderBooks = useCallback(
+    async (bookIds: string[]): Promise<void> => {
+      // 批量更新 sort_order
+      const updates = bookIds.map((id, index) => ({
+        id,
+        sort_order: index,
+      }))
+
+      for (const update of updates) {
+        await supabase
+          .from('books')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id)
+      }
+
+      // 更新本地状态
+      setBooks((prev) => {
+        const bookMap = new Map(prev.map((b) => [b.id, b]))
+        return bookIds
+          .map((id) => bookMap.get(id))
+          .filter((b): b is Book => b !== undefined)
+      })
+    },
+    []
+  )
   return {
     books,
     loading,
@@ -255,5 +285,8 @@ export function useBooks(type: ShelfType): UseBooksReturn {
     uploadBook,
     updateBook,
     deleteBook,
+    reorderBooks,
   }
 }
+
+
