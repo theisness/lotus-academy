@@ -1,11 +1,12 @@
 diff --git a/node_modules/react-pdf-highlighter-extended/dist/esm/components/PdfHighlighter.js b/node_modules/react-pdf-highlighter-extended/dist/esm/components/PdfHighlighter.js
-index de322e6..53f1eef 100644
+index 49b55d0..e541450 100644
 --- a/node_modules/react-pdf-highlighter-extended/dist/esm/components/PdfHighlighter.js
 +++ b/node_modules/react-pdf-highlighter-extended/dist/esm/components/PdfHighlighter.js
-@@ -14,13 +14,13 @@ import { HighlightLayer } from "./HighlightLayer";
+@@ -13,14 +13,15 @@ import { asElement, findOrCreateContainerLayer, getPagesFromRange, getWindow, is
+ import { HighlightLayer } from "./HighlightLayer";
  import { MouseSelection } from "./MouseSelection";
  import { TipContainer } from "./TipContainer";
- let EventBus, PDFLinkService, PDFViewer;
+-let EventBus, PDFLinkService, PDFViewer;
 -(async () => {
 -    // Due to breaking changes in PDF.js 4.0.189. See issue #17228
 -    const pdfjs = await import("pdfjs-dist/web/pdf_viewer.mjs");
@@ -13,17 +14,19 @@ index de322e6..53f1eef 100644
 -    PDFLinkService = pdfjs.PDFLinkService;
 -    PDFViewer = pdfjs.PDFViewer;
 -})();
++let EventBus, PDFLinkService, PDFViewer, PDFFindController;
 +const pdfjsViewerReady = typeof document !== "undefined"
 +    ? import("pdfjs-dist/web/pdf_viewer.mjs").then((pdfjs) => {
 +        EventBus = pdfjs.EventBus;
 +        PDFLinkService = pdfjs.PDFLinkService;
 +        PDFViewer = pdfjs.PDFViewer;
++        PDFFindController = pdfjs.PDFFindController;
 +    })
 +    : Promise.resolve();
  const SCROLL_MARGIN = 10;
  const DEFAULT_SCALE_VALUE = "auto";
  const DEFAULT_TEXT_SELECTION_COLOR = "rgba(153,193,218,255)";
-@@ -53,17 +53,26 @@ export const PdfHighlighter = ({ highlights, onScrollAway, pdfScaleValue = DEFAU
+@@ -53,17 +54,26 @@ export const PdfHighlighter = ({ highlights, onScrollAway, pdfScaleValue = DEFAU
      const isAreaSelectionInProgressRef = useRef(false);
      const isEditInProgressRef = useRef(false);
      const updateTipPositionRef = useRef(() => { });
@@ -55,7 +58,18 @@ index de322e6..53f1eef 100644
          const debouncedDocumentInit = debounce(() => {
              viewerRef.current =
                  viewerRef.current ||
-@@ -80,28 +89,29 @@ export const PdfHighlighter = ({ highlights, onScrollAway, pdfScaleValue = DEFAU
+@@ -73,6 +83,10 @@ export const PdfHighlighter = ({ highlights, onScrollAway, pdfScaleValue = DEFAU
+                         textLayerMode: 2,
+                         removePageBorders: true,
+                         linkService: linkServiceRef.current,
++                        findController: new PDFFindController({
++                            linkService: linkServiceRef.current,
++                            eventBus: eventBusRef.current,
++                        }),
+                     });
+             viewerRef.current.setDocument(pdfDocument);
+             linkServiceRef.current.setDocument(pdfDocument);
+@@ -80,28 +94,29 @@ export const PdfHighlighter = ({ highlights, onScrollAway, pdfScaleValue = DEFAU
              setIsViewerReady(true);
          }, 100);
          debouncedDocumentInit();
