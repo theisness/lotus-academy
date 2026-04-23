@@ -20,21 +20,22 @@ ALTER TABLE user_messages ENABLE ROW LEVEL SECURITY;
 -- profiles 表策略
 -- ============================================================
 
--- SELECT: 用 security definer 函数避免递归
-CREATE OR REPLACE FUNCTION is_admin()
+-- 基于 JWT 的管理员检查函数（避免查询 profiles 表导致 RLS 递归）
+CREATE OR REPLACE FUNCTION is_admin_jwt()
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+  SELECT COALESCE(
+    (current_setting('request.jwt.claims', true)::json->>'role') = 'admin',
+    false
   );
-$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE sql STABLE;
 
--- SELECT: 自己可见，或者是 admin
+-- SELECT: 自己可见，或者是 admin（通过 JWT 判断）
 CREATE POLICY profiles_select ON profiles
   FOR SELECT USING (
-    auth.uid() = id OR is_admin()
+    auth.uid() = id OR is_admin_jwt()
   );
 
--- UPDATE: 普通用户仅修改自己的昵称、头像、简介、页面偏好（不可修改 role 和 group_tags）
+-- UPDATE: 普通用户仅修改自己的资料（不可修改 role 和 group_tags，防止提权）
 CREATE POLICY profiles_update_self ON profiles
   FOR UPDATE USING (auth.uid() = id)
   WITH CHECK (
@@ -45,8 +46,8 @@ CREATE POLICY profiles_update_self ON profiles
 
 -- 管理员可更新任何用户的 profile（包括 role 和 group_tags）
 CREATE POLICY profiles_update_admin ON profiles
-  FOR UPDATE USING (is_admin())
-  WITH CHECK (is_admin());
+  FOR UPDATE USING (is_admin_jwt())
+  WITH CHECK (is_admin_jwt());
 
 -- ============================================================
 -- books 表策略

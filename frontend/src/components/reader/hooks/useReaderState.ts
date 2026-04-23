@@ -1,31 +1,24 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
 import { ScrollMode, SpreadMode } from 'pdfjs-dist/web/pdf_viewer.mjs'
-import type {
-  PdfHighlighterUtils,
-  PdfSelection,
-  PdfScaleValue,
-  ScaledPosition,
-} from 'react-pdf-highlighter-extended'
 import { useAnnotations } from '@/hooks/useAnnotations'
 import type { AnnotationPosition } from '@/types/database'
+import { scaledToViewport } from '../lib/pdf-utils'
 import { HIGHLIGHT_COLORS, DEFAULT_COLOR, COLOR_STORAGE_KEY } from '../constants'
 import type { ReaderHighlight } from '../types'
 
-export function useReaderState(bookId: string, canAnnotate: boolean) {
-  const {
-    annotations,
-    addAnnotation,
-    updateAnnotation,
-    deleteAnnotation,
-  } = useAnnotations(bookId)
+const SCROLL_MARGIN = 10
 
-  const highlighterUtilsRef = useRef<PdfHighlighterUtils>()
-  const currentSelectionRef = useRef<PdfSelection | null>(null)
+export function useReaderState(bookId: string, canAnnotate: boolean) {
+  const { annotations, addAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(bookId)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const viewerRef = useRef<any>(null)
+  const pendingSelectionRef = useRef<{ position: AnnotationPosition; text: string } | null>(null)
   const pdfDocumentRef = useRef<import('pdfjs-dist').PDFDocumentProxy | null>(null)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [scale, setScale] = useState<PdfScaleValue>('page-width')
+  const [scale, setScale] = useState<number | string>('page-width')
   const [activeColor, setActiveColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(COLOR_STORAGE_KEY)
@@ -40,12 +33,13 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   const [mobileArrowsVisible, setMobileArrowsVisible] = useState(true)
   const [scrolledToHighlightId, setScrolledToHighlightId] = useState<string | null>(null)
 
-  // --- search state ---
+  // search state
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchResults, setSearchResults] = useState<Array<{ page: number; text: string; matchIdx: number }>>([])
   const [searchActiveIndex, setSearchActiveIndex] = useState(-1)
   const [searchSearching, setSearchSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchInputQuery, setSearchInputQuery] = useState('')
 
   const [scrollType, setScrollType] = useState<'scroll' | 'page'>(() => {
     if (typeof window !== 'undefined') {
@@ -70,11 +64,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
       .filter((ann) => ann.type === 'highlight')
       .map((ann) => ({
         id: ann.id,
-        type: 'text' as const,
-        position: {
-          boundingRect: (ann.position as AnnotationPosition).boundingRect as ScaledPosition['boundingRect'],
-          rects: (ann.position as AnnotationPosition).rects as ScaledPosition['rects'],
-        },
+        position: ann.position as AnnotationPosition,
         color: ann.color || DEFAULT_COLOR,
         comment: ann.content || '',
         annotationId: ann.id,
@@ -85,8 +75,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     return annotations.filter((ann) => ann.type === 'note')
   }, [annotations])
 
-  const actualScale = typeof scale === 'number' ? scale
-    : (highlighterUtilsRef.current?.getViewer()?.currentScale ?? 1.0)
+  const actualScale = viewerRef.current?.currentScale ?? 1.0
 
   // --- callbacks ---
 
@@ -97,48 +86,64 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
 
   const handleScrollToHighlight = useCallback((id: string) => {
     const hl = highlights.find((h) => h.id === id)
-    if (hl) {
-      highlighterUtilsRef.current?.scrollToHighlight(hl)
-      setScrolledToHighlightId(id)
-    }
+    const viewer = viewerRef.current
+    if (!hl || !viewer) return
+    const pageNumber = hl.position.boundingRect.pageNumber ?? hl.position.pageNumber
+    const pageView = viewer.getPageView(pageNumber - 1)
+    if (!pageView) return
+    const viewport = pageView.viewport
+    const vr = scaledToViewport(hl.position.boundingRect, viewport)
+    viewer.scrollPageIntoView({
+      pageNumber,
+      destArray: [null, { name: 'XYZ' }, ...viewport.convertToPdfPoint(0, vr.top - SCROLL_MARGIN), 0],
+    })
+    setScrolledToHighlightId(id)
+    setTimeout(() => setScrolledToHighlightId(null), 2000)
   }, [highlights])
 
-  const handleSelection = useCallback((selection: PdfSelection) => {
+  const handleSelection = useCallback((position: AnnotationPosition, text: string) => {
     if (!canAnnotate) return
-    currentSelectionRef.current = selection
+    pendingSelectionRef.current = { position, text }
   }, [canAnnotate])
 
   const handleCreateHighlight = useCallback(async () => {
-    if (!canAnnotate || !currentSelectionRef.current) return
-    const ghostHighlight = currentSelectionRef.current.makeGhostHighlight()
-    if (!ghostHighlight) return
+    if (!canAnnotate || !pendingSelectionRef.current) return
+    const { position } = pendingSelectionRef.current
     try {
       await addAnnotation({
         type: 'highlight',
-        position: ghostHighlight.position as unknown as AnnotationPosition,
+        position,
         color: activeColor,
         content: null,
-        page_number: ghostHighlight.position.boundingRect.pageNumber,
+        page_number: position.pageNumber,
       })
     } catch {}
-    highlighterUtilsRef.current?.removeGhostHighlight()
-    highlighterUtilsRef.current?.setTip(null)
-    currentSelectionRef.current = null
+    pendingSelectionRef.current = null
   }, [canAnnotate, addAnnotation, activeColor])
 
   const handleCancelSelection = useCallback(() => {
-    highlighterUtilsRef.current?.removeGhostHighlight()
-    highlighterUtilsRef.current?.setTip(null)
-    currentSelectionRef.current = null
+    pendingSelectionRef.current = null
   }, [])
+
+  const handleCreateComment = useCallback(async (position: AnnotationPosition, text: string, comment: string) => {
+    if (!comment.trim()) return
+    try {
+      await addAnnotation({
+        type: 'highlight',
+        position,
+        color: activeColor,
+        content: comment.trim(),
+        page_number: position.pageNumber,
+      })
+    } catch {}
+  }, [addAnnotation, activeColor])
 
   const handlePrevPage = useCallback(() => {
     const step = displayMode === 'double' ? 2 : 1
     const newPage = Math.max(1, currentPage - step)
     if (newPage !== currentPage) {
       setCurrentPage(newPage)
-      const viewer = highlighterUtilsRef.current?.getViewer()
-      if (viewer) viewer.currentPageNumber = newPage
+      if (viewerRef.current) viewerRef.current.currentPageNumber = newPage
     }
   }, [currentPage, displayMode])
 
@@ -147,8 +152,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     const newPage = Math.min(totalPages, currentPage + step)
     if (newPage !== currentPage) {
       setCurrentPage(newPage)
-      const viewer = highlighterUtilsRef.current?.getViewer()
-      if (viewer) viewer.currentPageNumber = newPage
+      if (viewerRef.current) viewerRef.current.currentPageNumber = newPage
     }
   }, [currentPage, totalPages, displayMode])
 
@@ -160,6 +164,11 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   const handleUpdateComment = useCallback(async (highlightId: string, comment: string) => {
     if (!canAnnotate) return
     try { await updateAnnotation(highlightId, { content: comment || null }) } catch {}
+  }, [canAnnotate, updateAnnotation])
+
+  const handleUpdateColor = useCallback(async (highlightId: string, color: string) => {
+    if (!canAnnotate) return
+    try { await updateAnnotation(highlightId, { color }) } catch {}
   }, [canAnnotate, updateAnnotation])
 
   const handleAddNote = useCallback(async (content: string) => {
@@ -192,8 +201,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   const handlePageChange = useCallback((page: number) => {
     if (page < 1 || page > totalPages) return
     setCurrentPage(page)
-    const viewer = highlighterUtilsRef.current?.getViewer()
-    if (viewer) viewer.currentPageNumber = page
+    if (viewerRef.current) viewerRef.current.currentPageNumber = page
   }, [totalPages])
 
   const handleScaleChange = useCallback((newScale: number) => {
@@ -201,7 +209,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   }, [])
 
   const applyViewerModes = useCallback((scroll: 'scroll' | 'page', display: 'single' | 'double') => {
-    const viewer = highlighterUtilsRef.current?.getViewer()
+    const viewer = viewerRef.current
     if (!viewer) return
     viewer.scrollMode = scroll === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
     viewer.spreadMode = display === 'double' ? SpreadMode.ODD : SpreadMode.NONE
@@ -232,9 +240,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
       setSearchResults([])
       setSearchActiveIndex(-1)
       setSearchQuery('')
-      // clear pdfjs highlight
-      const viewer = highlighterUtilsRef.current?.getViewer()
-      viewer?.eventBus?.dispatch('findbarclose', { source: null })
+      viewerRef.current?.eventBus?.dispatch('findbarclose', { source: null })
       return
     }
     setSearchSearching(true)
@@ -246,9 +252,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i)
       const content = await page.getTextContent()
-      const pageText = content.items
-        .map((item) => ('str' in item ? item.str : ''))
-        .join('')
+      const pageText = content.items.map((item) => ('str' in item ? item.str : '')).join('')
       let start = 0
       let matchIdx = 0
       const lower = pageText.toLowerCase()
@@ -271,10 +275,8 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     setSearchActiveIndex(results.length > 0 ? 0 : -1)
     setSearchSearching(false)
 
-    // trigger pdfjs find highlight
     if (results.length > 0) {
-      const viewer = highlighterUtilsRef.current?.getViewer()
-      viewer?.eventBus?.dispatch('find', {
+      viewerRef.current?.eventBus?.dispatch('find', {
         source: null, type: '', query: query.trim(),
         caseSensitive: false, entireWord: false,
         highlightAll: true, findPrevious: false, matchDiacritics: false,
@@ -287,44 +289,25 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     if (!r) return
     setSearchActiveIndex(index)
     handlePageChange(r.page)
-    // sync pdfjs findController selected highlight
-    const viewer = highlighterUtilsRef.current?.getViewer()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fc = viewer?.findController as any
+    const fc = viewerRef.current?.findController as any
     if (fc?._selected) {
       fc._selected.pageIdx = r.page - 1
       fc._selected.matchIdx = r.matchIdx
-      viewer!.eventBus.dispatch('updatetextlayermatches', { source: null, pageIndex: -1 })
+      viewerRef.current!.eventBus.dispatch('updatetextlayermatches', { source: null, pageIndex: -1 })
     }
   }, [searchResults, handlePageChange])
 
   const handleSearchClose = useCallback(() => {
     setSearchOpen(false)
-    setSearchResults([])
-    setSearchActiveIndex(-1)
-    const viewer = highlighterUtilsRef.current?.getViewer()
-    viewer?.eventBus?.dispatch('findbarclose', { source: null })
   }, [])
 
   const handleToggleSearch = useCallback(() => {
-    setSearchOpen((prev) => {
-      if (prev) {
-        // closing
-        setSearchResults([])
-        setSearchActiveIndex(-1)
-        const viewer = highlighterUtilsRef.current?.getViewer()
-        viewer?.eventBus?.dispatch('findbarclose', { source: null })
-      }
-      return !prev
-    })
+    setSearchOpen((prev) => !prev)
   }, [])
-
   return {
-    // refs
-    highlighterUtilsRef,
-    currentSelectionRef,
+    viewerRef,
     pdfDocumentRef,
-    // state
     annotations,
     currentPage, setCurrentPage,
     totalPages, setTotalPages,
@@ -336,39 +319,16 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     outlineOpen, setOutlineOpen,
     mobileArrowsVisible, setMobileArrowsVisible,
     scrolledToHighlightId, setScrolledToHighlightId,
-    scrollType,
-    displayMode,
-    // derived
-    highlights,
-    allNotes,
-    actualScale,
-    // callbacks
-    handleColorChange,
-    handleScrollToHighlight,
-    handleSelection,
-    handleCreateHighlight,
-    handleCancelSelection,
-    handlePrevPage,
-    handleNextPage,
-    handleDeleteHighlight,
-    handleUpdateComment,
-    handleAddNote,
-    handleUpdateNote,
-    handleDeleteNote,
-    handlePageChange,
-    handleScaleChange,
-    handleScrollTypeChange,
-    handleDisplayModeChange,
-    applyViewerModes,
-    // search
-    searchOpen,
-    searchResults,
-    searchActiveIndex,
-    searchSearching,
-    searchQuery,
-    handleSearch,
-    handleSearchJump,
-    handleSearchClose,
-    handleToggleSearch,
+    scrollType, displayMode,
+    highlights, allNotes, actualScale,
+    handleColorChange, handleScrollToHighlight,
+    handleSelection, handleCreateHighlight, handleCancelSelection, handleCreateComment,
+    handlePrevPage, handleNextPage,
+    handleDeleteHighlight, handleUpdateComment, handleUpdateColor,
+    handleAddNote, handleUpdateNote, handleDeleteNote,
+    handlePageChange, handleScaleChange,
+    handleScrollTypeChange, handleDisplayModeChange, applyViewerModes,
+    searchOpen, searchResults, searchActiveIndex, searchSearching, searchQuery, searchInputQuery, setSearchInputQuery,
+    handleSearch, handleSearchJump, handleSearchClose, handleToggleSearch,
   }
 }

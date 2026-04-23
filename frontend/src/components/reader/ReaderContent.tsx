@@ -2,17 +2,13 @@
 
 import React from 'react'
 import { ScrollMode, SpreadMode } from 'pdfjs-dist/web/pdf_viewer.mjs'
-import { PdfLoader } from 'react-pdf-highlighter-extended'
-import type { PdfHighlighterUtils } from 'react-pdf-highlighter-extended'
-import { SpinnerGap, WarningCircle, CaretLeft, CaretRight, X } from '@phosphor-icons/react'
+import { SpinnerGap, CaretLeft, CaretRight, X } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { OutlinePanel } from './OutlinePanel'
 import { SearchPanel } from './SearchPanel'
 import { AnnotationPanel } from './AnnotationPanel'
 import { NotePanel } from './NotePanel'
-import { SelectionTip } from './SelectionTip'
-import { PdfHighlighterWithPages } from './PdfHighlighterWithPages'
-import { HighlightContainer } from './HighlightContainer'
+import { PdfViewerCore } from './PdfViewerCore'
 import type { useReaderState } from './hooks/useReaderState'
 
 type ReaderState = ReturnType<typeof useReaderState>
@@ -20,12 +16,14 @@ type ReaderState = ReturnType<typeof useReaderState>
 interface ReaderContentProps {
   fileUrl: string
   canAnnotate: boolean
+  canComment: boolean
+  currentUserNickname?: string
   state: ReaderState
 }
 
-export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProps) {
+export function ReaderContent({ fileUrl, canAnnotate, canComment, state }: ReaderContentProps) {
   const {
-    highlighterUtilsRef,
+    viewerRef,
     pdfDocumentRef,
     currentPage,
     setCurrentPage,
@@ -51,11 +49,12 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
     allNotes,
     handleSelection,
     handleCreateHighlight,
-    handleCancelSelection,
+    handleCreateComment,
     handlePrevPage,
     handleNextPage,
     handleDeleteHighlight,
     handleUpdateComment,
+    handleUpdateColor,
     handleAddNote,
     handleUpdateNote,
     handleDeleteNote,
@@ -67,6 +66,8 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
     searchActiveIndex,
     searchSearching,
     searchQuery,
+    searchInputQuery,
+    setSearchInputQuery,
     handleSearch,
     handleSearchJump,
   } = state
@@ -79,10 +80,7 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
           <div className="px-3 py-2 border-b border-zinc-700 text-xs font-medium text-zinc-400 uppercase tracking-wider">
             章节目录
           </div>
-          <OutlinePanel
-            pdfDocument={pdfDocumentRef.current}
-            onPageChange={handlePageChange}
-          />
+          <OutlinePanel pdfDocument={pdfDocumentRef.current} onPageChange={handlePageChange} />
         </div>
       )}
 
@@ -95,6 +93,8 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
             searching={searchSearching}
             activeIndex={searchActiveIndex}
             query={searchQuery}
+            inputQuery={searchInputQuery}
+            onInputQueryChange={setSearchInputQuery}
             onSearch={handleSearch}
             onJump={handleSearchJump}
           />
@@ -103,7 +103,7 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
 
       {/* PDF 阅读器 */}
       <div
-        className={`relative flex-1 overflow-auto${scrollType === 'page' ? ' pdf-page-mode' : ''}`}
+        className={`relative flex-1 overflow-hidden${scrollType === 'page' ? ' pdf-page-mode' : ''}`}
         onPointerUp={() => { if (mobileArrowsVisible) setMobileArrowsVisible(false) }}
       >
         {/* 加载指示器 */}
@@ -122,85 +122,49 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
           </div>
         )}
 
-        <PdfLoader
-          document={fileUrl}
-          beforeLoad={() => {
-            setIsLoading(true)
-            return (
-              <div className="flex h-full items-center justify-center">
-                <motion.span
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                  className="inline-flex text-[var(--color-accent)]"
-                >
-                  <SpinnerGap size={32} />
-                </motion.span>
-              </div>
-            )
+        <PdfViewerCore
+          fileUrl={fileUrl}
+          scale={scale}
+          highlights={highlights}
+          scrollType={scrollType}
+          displayMode={displayMode}
+          canAnnotate={canAnnotate}
+          canComment={canComment}
+          activeColor={activeColor}
+          scrolledToHighlightId={scrolledToHighlightId}
+          onDocumentLoad={(doc) => { pdfDocumentRef.current = doc }}
+          onViewerReady={(viewer) => {
+            viewerRef.current = viewer
           }}
-          errorMessage={(error) => {
-            console.error('[PdfReader] Load error:', error)
+          onPageChange={setCurrentPage}
+          onTotalPages={setTotalPages}
+          onScaleChange={(s) => setScale(s)}
+          onSelection={(position, text) => {
+            handleSelection(position, text)
+            handleCreateHighlight()
+          }}
+          onComment={(position, text, comment) => handleCreateComment(position, text, comment)}
+          onHighlightClick={(id) => handleScrollToHighlight(id)}
+          onHighlightDelete={(id) => handleDeleteHighlight(id)}
+          onHighlightUpdateComment={(id, comment) => handleUpdateComment(id, comment)}
+          onHighlightUpdateColor={(id, color) => handleUpdateColor(id, color)}
+          onScrollAway={() => setScrolledToHighlightId(null)}
+          onLoadComplete={() => {
             setIsLoading(false)
-            return (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <WarningCircle size={32} weight="duotone" className="text-zinc-400" />
-                <p className="text-sm text-zinc-400">PDF 文件加载失败</p>
-                <p className="text-xs text-zinc-500">{String(error)}</p>
-              </div>
-            )
+            const v = viewerRef.current
+            if (v) {
+              v.scrollMode = scrollType === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
+              v.spreadMode = displayMode === 'double' ? SpreadMode.ODD : SpreadMode.NONE
+            }
+            setTimeout(() => {
+              if (viewerRef.current?.currentScale) setScale(viewerRef.current.currentScale)
+            }, 100)
           }}
-        >
-          {(pdfDocument) => {
-            pdfDocumentRef.current = pdfDocument
-            return (
-              <PdfHighlighterWithPages
-                key={fileUrl}
-                pdfDocument={pdfDocument}
-                onTotalPages={setTotalPages}
-                onLoadComplete={() => {
-                  setIsLoading(false)
-                  const viewer = highlighterUtilsRef.current?.getViewer()
-                  if (viewer) {
-                    viewer.scrollMode = scrollType === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
-                    viewer.spreadMode = displayMode === 'double' ? SpreadMode.ODD : SpreadMode.NONE
-                  }
-                  setTimeout(() => {
-                    const v = highlighterUtilsRef.current?.getViewer()
-                    if (v?.currentScale) setScale(v.currentScale)
-                  }, 100)
-                }}
-                highlights={highlights}
-                pdfScaleValue={scale}
-                onSelection={canAnnotate ? handleSelection : undefined}
-                textSelectionColor={canAnnotate ? activeColor : 'transparent'}
-                utilsRef={(utils: PdfHighlighterUtils) => {
-                  highlighterUtilsRef.current = utils
-                  const viewer = utils.getViewer()
-                  if (viewer?.eventBus) {
-                    viewer.eventBus.on('pagechanging', (e: { pageNumber: number }) => {
-                      setCurrentPage(e.pageNumber)
-                    })
-                  }
-                }}
-                selectionTip={canAnnotate ? (
-                  <SelectionTip
-                    activeColor={activeColor}
-                    onHighlight={handleCreateHighlight}
-                    onCancel={handleCancelSelection}
-                  />
-                ) : undefined}
-                onScrollAway={() => setScrolledToHighlightId(null)}
-              >
-                <HighlightContainer
-                  canAnnotate={canAnnotate}
-                  onDelete={handleDeleteHighlight}
-                  onUpdateComment={handleUpdateComment}
-                  scrolledToHighlightId={scrolledToHighlightId}
-                />
-              </PdfHighlighterWithPages>
-            )
+          onError={(err) => {
+            setIsLoading(false)
+            console.error('[PdfReader] Load error:', err)
           }}
-        </PdfLoader>
+        />
 
         {/* 边缘翻页箭头（仅在单屏切换模式显示） */}
         {scrollType === 'page' && (
@@ -246,7 +210,6 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
         <div className="shrink-0 border-l border-zinc-700/50 bg-zinc-900 overflow-hidden
           w-full sm:w-auto absolute sm:relative inset-0 sm:inset-auto z-30 sm:z-auto">
           <div className="flex h-full w-full sm:w-[320px] flex-col">
-            {/* Tab 头 */}
             <div className="flex items-center border-b border-zinc-700/50">
               <button
                 onClick={() => setSidePanelTab('annotations')}
@@ -262,15 +225,10 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
               >
                 笔记 {allNotes.length > 0 && `(${allNotes.length})`}
               </button>
-              <button
-                onClick={() => setSidePanelOpen(false)}
-                className="p-2 text-zinc-500 hover:text-zinc-300"
-                aria-label="关闭"
-              >
+              <button onClick={() => setSidePanelOpen(false)} className="p-2 text-zinc-500 hover:text-zinc-300" aria-label="关闭">
                 <X size={16} />
               </button>
             </div>
-            {/* Tab 内容 */}
             <div className="flex-1 overflow-hidden">
               {sidePanelTab === 'annotations' ? (
                 <AnnotationPanel

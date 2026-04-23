@@ -54,7 +54,7 @@ export interface Book {
 }
 
 /**
- * 批注位置数据 — react-pdf-highlighter-extended 格式
+ * 批注位置数据 — pdfjs 坐标格式
  * 包含页码、边界矩形、文本范围等信息
  */
 export interface AnnotationPosition {

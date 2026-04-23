@@ -63,7 +63,7 @@ body {
 }
 
 /* PDF 阅读器文本层：全局 ::selection 的 color 属性会导致文字重影，重置为透明 */
-.PdfHighlighter .textLayer ::selection {
+.pdf-viewer-core .textLayer ::selection {
   color: transparent;
 }
 
@@ -80,18 +80,31 @@ body {
 }
 
 
-/* PDF 阅读器内禁用原生选中样式，避免与 pdf-highlighter 的选中颜色重影 */
-.PdfHighlighter ::selection {
-  background-color: transparent;
+/* PDF 阅读器内文本层样式覆盖 */
+.pdf-viewer-core .textLayer {
+  z-index: 2;
+  opacity: 1;
+  mix-blend-mode: multiply;
 }
 
-
 /* 单屏翻页模式下页面垂直居中 */
-.pdf-page-mode .PdfHighlighter {
+.pdf-page-mode .pdf-viewer-core {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100%;
+}
+
+/* 高亮 overlay */
+.highlight-group {
+  cursor: pointer;
+}
+.highlight-group--scrolled-to .highlight-rect {
+  animation: highlight-flash 0.6s ease-in-out 3;
+}
+@keyframes highlight-flash {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
 }
 
 /* PDF 搜索高亮 — pdfjs findController */

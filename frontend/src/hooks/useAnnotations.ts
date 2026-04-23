@@ -33,7 +33,7 @@ export function useAnnotations(bookId: string): UseAnnotationsReturn {
     try {
       const { data, error } = await supabase
         .from('annotations')
-        .select('*')
+        .select('*, profiles(nickname)')
         .eq('book_id', bookId)
         .order('created_at', { ascending: true })
 

@@ -234,6 +234,8 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
       bookId={bookId}
       fileUrl={fileUrl}
       canAnnotate={canAnnotate}
+      canComment={!!user}
+      currentUserNickname={user?.nickname ?? user?.email ?? undefined}
       bookTitle={book.title}
       onBack={handleBack}
     />

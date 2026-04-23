@@ -235,11 +235,20 @@ export function NotePanel({
                             {note.content}
                           </p>
                           <div className="mt-2 flex items-center justify-between">
-                            <span className="text-[10px] text-zinc-600">
-                              {new Date(note.created_at).toLocaleString('zh-CN', {
-                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                              })}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                              {(note as any).profiles?.nickname && (
+                                <span className="text-[10px] text-zinc-400 font-medium">
+                                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                  {(note as any).profiles.nickname}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-zinc-600">
+                                {new Date(note.created_at).toLocaleString('zh-CN', {
+                                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
                             {canAnnotate && (
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button

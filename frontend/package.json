@@ -6,8 +6,7 @@
     "dev": "next dev -p 3004 --turbopack",
     "build": "next build",
     "start": "next start -p 3004 ",
-    "lint": "next lint",
-    "postinstall": "patch-package"
+    "lint": "next lint"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -18,11 +17,7 @@
     "next": "15.5.15",
     "pdfjs-dist": "4.4.168",
     "react": "^18",
-    "react-dom": "^18",
-    "react-pdf-highlighter-extended": "^8.1.0"
-  },
-  "overrides": {
-    "pdfjs-dist": "4.4.168"
+    "react-dom": "^18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
@@ -31,7 +26,6 @@
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "15.5.15",
-    "patch-package": "^8.0.1",
     "postcss": "^8",
     "tailwindcss": "^4.2.2",
     "typescript": "^5"

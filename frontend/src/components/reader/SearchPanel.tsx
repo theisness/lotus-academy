@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { MagnifyingGlass, SpinnerGap } from '@phosphor-icons/react'
 
 export interface SearchResult {
@@ -14,6 +14,8 @@ interface SearchPanelProps {
   searching: boolean
   activeIndex: number
   query: string
+  inputQuery: string
+  onInputQueryChange: (q: string) => void
   onSearch: (query: string) => void
   onJump: (index: number) => void
 }
@@ -37,10 +39,11 @@ export function SearchPanel({
   searching,
   activeIndex,
   query: searchQuery,
+  inputQuery,
+  onInputQueryChange,
   onSearch,
   onJump,
 }: SearchPanelProps) {
-  const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const activeRef = useRef<HTMLButtonElement>(null)
 
@@ -66,8 +69,8 @@ export function SearchPanel({
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    onSearch(query)
-  }, [query, onSearch])
+    onSearch(inputQuery)
+  }, [inputQuery, onSearch])
 
   return (
     <div className="flex h-full flex-col">
@@ -78,12 +81,12 @@ export function SearchPanel({
           <input
             ref={inputRef}
             type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={inputQuery}
+            onChange={(e) => onInputQueryChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
-                onSearch(query)
+                onSearch(inputQuery)
               }
             }}
             placeholder="搜索内容…"
@@ -103,7 +106,7 @@ export function SearchPanel({
 
       {/* 结果列表 */}
       <div className="flex-1 overflow-y-auto">
-        {!searching && results.length === 0 && query && (
+        {!searching && results.length === 0 && inputQuery && (
           <p className="px-3 py-8 text-center text-sm text-zinc-500">无结果</p>
         )}
         {results.map((r, i) => (

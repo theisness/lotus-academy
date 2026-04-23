@@ -126,6 +126,17 @@ export function useAuth(): UseAuthReturn {
       }
       
       if (!mounted) return
+
+      // JWT 失效或退出登录 → 跳转到登录页
+      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+        setUser(null)
+        setIsAdmin(false)
+        setLoading(false)
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
+          window.location.href = '/auth'
+        }
+        return
+      }
       
       try {
         if (session?.user) {

@@ -213,6 +213,13 @@ export function AnnotationPanel({
                         className="h-2.5 w-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: ann.color || 'rgba(255,226,143,0.6)' }}
                       />
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(ann as any).profiles?.nickname && (
+                        <span className="text-[10px] text-zinc-400 font-medium">
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                          {(ann as any).profiles.nickname}
+                        </span>
+                      )}
                       <span className="text-[10px] text-zinc-600">
                         {new Date(ann.created_at).toLocaleString('zh-CN', {
                           month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
