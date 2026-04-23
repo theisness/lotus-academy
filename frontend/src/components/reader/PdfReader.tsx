@@ -14,7 +14,12 @@ import 'react-pdf-highlighter-extended/dist/esm/style/PdfHighlighter.css'
 export { HIGHLIGHT_COLORS } from './constants'
 
 // 使用本地 worker 文件，避免从 unpkg.com 下载
-GlobalWorkerOptions.workerSrc = '/pdf-worker/pdf.worker.min.mjs'
+if (typeof window !== 'undefined') {
+  GlobalWorkerOptions.workerPort = new Worker(
+    new URL('/pdf-worker/pdf.worker.min.mjs', window.location.origin),
+    { type: 'module' }
+  )
+}
 
 /**
  * PdfReader — PDF 阅读器核心组件

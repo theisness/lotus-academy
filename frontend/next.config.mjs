@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  output: 'export',
   // 禁用内置图片优化（项目使用 <img> 标签），避免打包 sharp 二进制（~19MB）
   images: {
     unoptimized: true,

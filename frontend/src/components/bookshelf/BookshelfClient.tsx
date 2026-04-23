@@ -148,7 +148,7 @@ updateBook,
 
   const handleBookClick = useCallback((book: Book) => {
     // Navigate to reader — placeholder for now
-    window.location.href = `/reader/${book.id}`
+    window.location.href = `/reader?bookId=${book.id}`
   }, [])
 
   // --- Edit flow handlers (admin only for public bookshelf) ---

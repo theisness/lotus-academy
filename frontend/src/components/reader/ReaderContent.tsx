@@ -124,7 +124,6 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
 
         <PdfLoader
           document={fileUrl}
-          workerSrc="/pdf-worker/pdf.worker.min.mjs"
           beforeLoad={() => {
             setIsLoading(true)
             return (

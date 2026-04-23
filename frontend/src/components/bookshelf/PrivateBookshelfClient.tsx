@@ -151,7 +151,7 @@ export function PrivateBookshelfClient() {
   }, [])
 
   const handleBookClick = useCallback((book: Book) => {
-    window.location.href = `/reader/${book.id}`
+    window.location.href = `/reader?bookId=${book.id}`
   }, [])
 
   // --- Edit flow handlers (user owns all private books) ---

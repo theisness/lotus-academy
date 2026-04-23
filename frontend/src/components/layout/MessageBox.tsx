@@ -213,8 +213,8 @@ export function MessageBox() {
   const handleNavigate = (bookId: string, page?: number | null) => {
     setOpen(false)
     const url = page
-      ? `/reader/${bookId}?page=${page}`
-      : `/reader/${bookId}`
+      ? `/reader?bookId=${bookId}&page=${page}`
+      : `/reader?bookId=${bookId}`
     router.push(url)
   }
 
