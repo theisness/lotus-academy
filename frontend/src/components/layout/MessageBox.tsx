@@ -182,7 +182,7 @@ export function MessageBox() {
   const containerRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const { user } = useAuthContext()
-  const { messages, unreadCount, loading, markAsRead, markAllAsRead } =
+  const { messages, unreadCount, loading, markAsRead, markAllAsRead, clearAll } =
     useMessages()
 
   /**
@@ -256,15 +256,26 @@ export function MessageBox() {
               <h3 className="text-sm font-semibold text-[var(--color-text)]">
                 消息通知
               </h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="flex items-center gap-1 text-xs text-[var(--color-accent)]
-                    hover:text-[var(--color-accent-hover)] transition-colors active:scale-[0.98]"
-                >
-                  <Checks size={14} weight="bold" />
-                  全部已读
-                </button>
+              {messages.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="flex items-center gap-1 text-xs text-[var(--color-accent)]
+                        hover:text-[var(--color-accent-hover)] transition-colors active:scale-[0.98]"
+                    >
+                      <Checks size={14} weight="bold" />
+                      全部已读
+                    </button>
+                  )}
+                  <button
+                    onClick={clearAll}
+                    className="flex items-center gap-1 text-xs text-[var(--color-text-subtle)]
+                      hover:text-red-400 transition-colors active:scale-[0.98]"
+                  >
+                    清空
+                  </button>
+                </div>
               )}
             </div>
 

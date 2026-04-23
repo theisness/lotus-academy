@@ -7,7 +7,7 @@ import { Envelope, Lock, ArrowRight, SpinnerGap, BookOpenText } from '@phosphor-
 import { useAuthContext } from '@/components/providers/AuthProvider'
 
 /** 表单模式 */
-type AuthMode = 'login' | 'register'
+type AuthMode = 'login' | 'register' | 'forgot'
 
 /** 表单字段错误 */
 interface FormErrors {
@@ -30,7 +30,7 @@ const springTransition = {
 
 export default function AuthPage() {
   const router = useRouter()
-  const { signIn, signUp } = useAuthContext()
+  const { signIn, signUp, resetPassword } = useAuthContext()
 
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
@@ -38,6 +38,7 @@ export default function AuthPage() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [registerSuccess, setRegisterSuccess] = useState(false)
+  const [resetSuccess, setResetSuccess] = useState(false)
 
   /** 客户端即时校验 */
   const validate = useCallback((): FormErrors => {
@@ -49,14 +50,16 @@ export default function AuthPage() {
       newErrors.email = '邮箱格式不正确'
     }
 
-    if (!password) {
-      newErrors.password = '请输入密码'
-    } else if (password.length < 8) {
-      newErrors.password = '密码长度不能少于 8 个字符'
+    if (mode !== 'forgot') {
+      if (!password) {
+        newErrors.password = '请输入密码'
+      } else if (password.length < 8) {
+        newErrors.password = '密码长度不能少于 8 个字符'
+      }
     }
 
     return newErrors
-  }, [email, password])
+  }, [email, password, mode])
 
   /** 提交表单 */
   const handleSubmit = useCallback(
@@ -73,7 +76,14 @@ export default function AuthPage() {
       setIsSubmitting(true)
 
       try {
-        if (mode === 'login') {
+        if (mode === 'forgot') {
+          const result = await resetPassword(email)
+          if (!result.success) {
+            setErrors({ general: result.error || '发送失败，请重试' })
+          } else {
+            setResetSuccess(true)
+          }
+        } else if (mode === 'login') {
           const result = await signIn(email, password)
           if (!result.success) {
             setErrors({ general: result.error || '登录失败，请重试' })
@@ -113,6 +123,7 @@ export default function AuthPage() {
     setMode((prev) => (prev === 'login' ? 'register' : 'login'))
     setErrors({})
     setRegisterSuccess(false)
+    setResetSuccess(false)
   }, [])
 
   /** 邮箱输入失焦时校验 */
@@ -173,14 +184,16 @@ export default function AuthPage() {
             transition={springTransition}
             className="text-3xl md:text-4xl font-semibold tracking-tighter leading-none text-[var(--color-text)] mb-2"
           >
-            {mode === 'login' ? '欢迎回来' : '创建账户'}
+            {mode === 'login' ? '欢迎回来' : mode === 'register' ? '创建账户' : '重置密码'}
           </motion.h1>
         </AnimatePresence>
 
         <p className="text-sm text-[var(--color-text-muted)] mb-8">
           {mode === 'login'
             ? '登录以继续使用莲花书院'
-            : '注册以开始使用莲花书院'}
+            : mode === 'register'
+              ? '注册以开始使用莲花书院'
+              : '输入邮箱，我们将发送重置链接'}
         </p>
 
         {/* 注册成功提示 */}
@@ -195,6 +208,19 @@ export default function AuthPage() {
             >
               <p className="text-sm text-[var(--color-text)]">
                 注册成功。请查收确认邮件后登录。
+              </p>
+            </motion.div>
+          )}
+          {resetSuccess && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={springTransition}
+              className="mb-6 rounded-lg border border-[var(--color-accent)]/20 bg-[var(--color-accent-muted)] px-4 py-3"
+            >
+              <p className="text-sm text-[var(--color-text)]">
+                重置链接已发送到 {email}，请查收邮件。
               </p>
             </motion.div>
           )}
@@ -271,7 +297,8 @@ export default function AuthPage() {
             </AnimatePresence>
           </div>
 
-          {/* 密码字段 */}
+          {/* 密码字段（忘记密码模式下隐藏） */}
+          {mode !== 'forgot' && (
           <div className="flex flex-col gap-2">
             <label
               htmlFor="password"
@@ -318,6 +345,18 @@ export default function AuthPage() {
               )}
             </AnimatePresence>
           </div>
+          )}
+
+          {/* 忘记密码链接（仅登录模式） */}
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setMode('forgot'); setErrors({}); setResetSuccess(false) }}
+              className="self-end -mt-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+            >
+              忘记密码？
+            </button>
+          )}
 
           {/* 提交按钮 */}
           <motion.button
@@ -342,7 +381,7 @@ export default function AuthPage() {
               </motion.span>
             ) : (
               <>
-                {mode === 'login' ? '登录' : '注册'}
+                {mode === 'login' ? '登录' : mode === 'register' ? '注册' : '发送重置链接'}
                 <ArrowRight size={16} />
               </>
             )}
@@ -351,10 +390,10 @@ export default function AuthPage() {
 
         {/* 模式切换 */}
         <div className="mt-8 flex items-center gap-1 text-sm text-[var(--color-text-muted)]">
-          <span>{mode === 'login' ? '还没有账户？' : '已有账户？'}</span>
+          <span>{mode === 'login' ? '还没有账户？' : mode === 'register' ? '已有账户？' : '想起密码了？'}</span>
           <button
             type="button"
-            onClick={toggleMode}
+            onClick={mode === 'forgot' ? () => { setMode('login'); setErrors({}); setResetSuccess(false) } : toggleMode}
             className="font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors"
           >
             {mode === 'login' ? '注册' : '登录'}

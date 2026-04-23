@@ -159,11 +159,23 @@ export function useMessages(): UseMessagesReturn {
     setUnreadCount(0)
   }, [supabase, messages])
 
+  const clearAll = useCallback(async (): Promise<void> => {
+    if (messages.length === 0) return
+    const { error } = await supabase
+      .from('user_messages')
+      .delete()
+      .in('id', messages.map((m) => m.id))
+    if (error) throw new Error(`清空消息失败: ${error.message}`)
+    setMessages([])
+    setUnreadCount(0)
+  }, [supabase, messages])
+
   return {
     messages,
     unreadCount,
     loading,
     markAsRead,
     markAllAsRead,
+    clearAll,
   }
 }

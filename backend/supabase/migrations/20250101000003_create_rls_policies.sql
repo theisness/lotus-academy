@@ -29,10 +29,10 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE sql STABLE;
 
--- SELECT: 自己可见，或者是 admin（通过 JWT 判断）
+-- SELECT: 已登录用户可查看所有 profiles（支持批注/笔记显示作者昵称）
 CREATE POLICY profiles_select ON profiles
   FOR SELECT USING (
-    auth.uid() = id OR is_admin_jwt()
+    auth.uid() IS NOT NULL
   );
 
 -- UPDATE: 普通用户仅修改自己的资料（不可修改 role 和 group_tags，防止提权）
@@ -120,7 +120,7 @@ CREATE POLICY annotations_select ON annotations
     )
   );
 
--- INSERT: 私有书籍 → 仅书籍所有者；公共书籍 → 仅管理员
+-- INSERT: 私有书籍 → 仅书籍所有者；公共书籍 → 所有登录用户
 CREATE POLICY annotations_insert ON annotations
   FOR INSERT WITH CHECK (
     auth.uid() = user_id
@@ -129,67 +129,23 @@ CREATE POLICY annotations_insert ON annotations
       WHERE b.id = book_id
         AND (
           (b.type = 'private' AND b.uploader_id = auth.uid())
-          OR (
-            b.type = 'public'
-            AND EXISTS (
-              SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-            )
-          )
+          OR (b.type = 'public' AND auth.uid() IS NOT NULL)
         )
     )
   );
 
--- UPDATE: 私有书籍 → 仅批注所有者（且为书籍所有者）；公共书籍 → 仅管理员
+-- UPDATE: 仅批注所有者可修改自己的批注
 CREATE POLICY annotations_update ON annotations
   FOR UPDATE USING (
     user_id = auth.uid()
-    AND EXISTS (
-      SELECT 1 FROM books b
-      WHERE b.id = annotations.book_id
-        AND (
-          (b.type = 'private' AND b.uploader_id = auth.uid())
-          OR (
-            b.type = 'public'
-            AND EXISTS (
-              SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-            )
-          )
-        )
-    )
   ) WITH CHECK (
     user_id = auth.uid()
-    AND EXISTS (
-      SELECT 1 FROM books b
-      WHERE b.id = book_id
-        AND (
-          (b.type = 'private' AND b.uploader_id = auth.uid())
-          OR (
-            b.type = 'public'
-            AND EXISTS (
-              SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-            )
-          )
-        )
-    )
   );
 
--- DELETE: 私有书籍 → 仅批注所有者（且为书籍所有者）；公共书籍 → 仅管理员
+-- DELETE: 仅批注所有者可删除自己的批注
 CREATE POLICY annotations_delete ON annotations
   FOR DELETE USING (
     user_id = auth.uid()
-    AND EXISTS (
-      SELECT 1 FROM books b
-      WHERE b.id = annotations.book_id
-        AND (
-          (b.type = 'private' AND b.uploader_id = auth.uid())
-          OR (
-            b.type = 'public'
-            AND EXISTS (
-              SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-            )
-          )
-        )
-    )
   );
 
 -- ============================================================

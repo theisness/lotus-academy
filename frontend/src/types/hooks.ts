@@ -24,6 +24,7 @@ export interface UseAuthReturn {
   signIn: (email: string, password: string) => Promise<AuthResult>
   signOut: () => Promise<void>
   updatePassword: (newPassword: string) => Promise<void>
+  resetPassword: (email: string) => Promise<AuthResult>
 }
 
 /** useBooks Hook 返回类型 */
@@ -65,6 +66,7 @@ export interface UseMessagesReturn {
   loading: boolean
   markAsRead: (messageId: string) => Promise<void>
   markAllAsRead: () => Promise<void>
+  clearAll: () => Promise<void>
 }
 
 /** useUserManagement Hook 返回类型 */

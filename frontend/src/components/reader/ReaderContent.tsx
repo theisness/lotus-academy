@@ -247,6 +247,7 @@ export function ReaderContent({ fileUrl, canAnnotate, canComment, state }: Reade
                   onAddNote={handleAddNote}
                   onUpdateNote={handleUpdateNote}
                   onDeleteNote={handleDeleteNote}
+                  onNavigateToPage={handlePageChange}
                   embedded
                 />
               )}

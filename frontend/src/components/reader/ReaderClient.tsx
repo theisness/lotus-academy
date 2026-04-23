@@ -104,17 +104,23 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
       const bookRecord = bookData as Book
       setBook(bookRecord)
 
-      // 通过 Supabase 客户端下载 PDF 文件（自动携带 apikey）
-      const { data: fileData, error: downloadError } = await supabase.storage
-        .from('books')
-        .download(bookRecord.file_path)
+      // 优先从 IndexedDB 缓存读取
+      const cacheKey = `${bookId}:${bookRecord.file_path}`
+      let fileBlob = await getCachedPdf(cacheKey)
 
-      if (downloadError || !fileData) {
-        throw new Error('无法下载 PDF 文件')
+      if (!fileBlob) {
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from('books')
+          .download(bookRecord.file_path)
+
+        if (downloadError || !fileData) {
+          throw new Error('无法下载 PDF 文件')
+        }
+        fileBlob = fileData
+        setCachedPdf(cacheKey, fileBlob as Blob)
       }
 
-      // 将 Blob 转为本地 URL 供 PdfLoader 使用
-      const blobUrl = URL.createObjectURL(fileData)
+      const blobUrl = URL.createObjectURL(fileBlob!)
       setFileUrl(blobUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
@@ -146,7 +152,7 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
    */
   const canAnnotate = (() => {
     if (!book || !user) return false
-    if (book.type === 'public') return isAdmin
+    if (book.type === 'public') return true
     if (book.type === 'private') return book.uploader_id === user.id
     return false
   })()

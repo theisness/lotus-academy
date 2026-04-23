@@ -78,6 +78,8 @@ services:
       GOTRUE_SMTP_USER: ${SMTP_USER:-}
       GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
       GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_USER:-}
+      GOTRUE_MAILER_EXTERNAL_HOSTS: ${SITE_URL:-http://localhost:3004}
     networks:
       - lotus
 

@@ -26,6 +26,7 @@ interface NotePanelProps {
   onAddNote: (content: string) => Promise<void>
   onUpdateNote: (noteId: string, content: string) => Promise<void>
   onDeleteNote: (noteId: string) => Promise<void>
+  onNavigateToPage?: (page: number) => void
   onClose?: () => void
   embedded?: boolean
 }
@@ -37,6 +38,7 @@ export function NotePanel({
   onAddNote,
   onUpdateNote,
   onDeleteNote,
+  onNavigateToPage,
   onClose,
   embedded,
 }: NotePanelProps) {
@@ -194,7 +196,8 @@ export function NotePanel({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
                       transition={springTransition}
-                      className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-2.5 group"
+                      className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-2.5 group cursor-pointer"
+                      onClick={() => onNavigateToPage?.(note.page_number ?? 0)}
                     >
                       {editingId === note.id ? (
                         <div className="flex flex-col gap-2">

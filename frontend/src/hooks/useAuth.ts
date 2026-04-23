@@ -115,7 +115,7 @@ export function useAuth(): UseAuthReturn {
     // 监听认证状态变化
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       console.log('[useAuth] Auth state changed:', event, 'initializing:', initializing)
       
       // 初始化期间忽略所有事件（initAuth 会处理），避免竞态
@@ -138,31 +138,34 @@ export function useAuth(): UseAuthReturn {
         return
       }
       
-      try {
-        if (session?.user) {
-          console.log('[useAuth] Fetching profile for session user:', session.user.id)
-          const profile = await fetchProfile(session.user.id)
-          if (mounted) {
-            setUser(profile)
-            setIsAdmin(profile?.role === 'admin')
+      // 异步处理 profile 获取，不阻塞 SDK 的 lock
+      void (async () => {
+        try {
+          if (session?.user) {
+            console.log('[useAuth] Fetching profile for session user:', session.user.id)
+            const profile = await fetchProfile(session.user.id)
+            if (mounted) {
+              setUser(profile)
+              setIsAdmin(profile?.role === 'admin')
+            }
+          } else {
+            if (mounted) {
+              setUser(null)
+              setIsAdmin(false)
+            }
           }
-        } else {
+        } catch (error) {
+          console.error('[useAuth] Auth state change error:', error)
           if (mounted) {
             setUser(null)
             setIsAdmin(false)
           }
+        } finally {
+          if (mounted) {
+            setLoading(false)
+          }
         }
-      } catch (error) {
-        console.error('[useAuth] Auth state change error:', error)
-        if (mounted) {
-          setUser(null)
-          setIsAdmin(false)
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
+      })()
     })
 
     return () => {
@@ -234,6 +237,20 @@ export function useAuth(): UseAuthReturn {
     [supabase]
   )
 
+  /**
+   * 发送密码重置邮件
+   */
+  const resetPassword = useCallback(
+    async (email: string): Promise<AuthResult> => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) return { success: false, error: error.message }
+      return { success: true }
+    },
+    [supabase]
+  )
+
   return {
     user,
     isAdmin,
@@ -242,6 +259,7 @@ export function useAuth(): UseAuthReturn {
     signIn,
     signOut,
     updatePassword,
+    resetPassword,
   }
 }
 

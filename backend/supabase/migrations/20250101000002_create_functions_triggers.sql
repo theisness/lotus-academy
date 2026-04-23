@@ -160,34 +160,16 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_message_id UUID;
   v_uploader_role TEXT;
+  v_nickname TEXT;
 BEGIN
-  -- 仅处理公共书籍
-  IF NEW.type != 'public' THEN
-    RETURN NEW;
-  END IF;
-
-  -- 检查上传者是否为管理员
-  SELECT role INTO v_uploader_role
-  FROM profiles
-  WHERE id = NEW.uploader_id;
-
-  IF v_uploader_role != 'admin' THEN
-    RETURN NEW;
-  END IF;
-
-  -- 创建消息
+  IF NEW.type != 'public' THEN RETURN NEW; END IF;
+  SELECT role, nickname INTO v_uploader_role, v_nickname FROM profiles WHERE id = NEW.uploader_id;
+  IF v_uploader_role != 'admin' THEN RETURN NEW; END IF;
+  v_nickname := COALESCE(v_nickname, '管理员');
   INSERT INTO messages (type, title, content, related_book_id)
-  VALUES (
-    'book_upload',
-    '新书上架',
-    '管理员上传了新书《' || NEW.title || '》',
-    NEW.id
-  )
+  VALUES ('book_upload', '新书上架', v_nickname || ' 上传了新书《' || NEW.title || '》', NEW.id)
   RETURNING id INTO v_message_id;
-
-  -- 分发给有权查看的用户
   PERFORM distribute_message_to_visible_users(v_message_id, NEW.id);
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -207,44 +189,17 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_message_id UUID;
   v_updater_role TEXT;
+  v_nickname TEXT;
 BEGIN
-  -- 仅处理公共书籍
-  IF NEW.type != 'public' THEN
-    RETURN NEW;
-  END IF;
-
-  -- 检查操作者是否为管理员
-  SELECT role INTO v_updater_role
-  FROM profiles
-  WHERE id = auth.uid();
-
-  IF v_updater_role != 'admin' THEN
-    RETURN NEW;
-  END IF;
-
-  -- 检查是否有实质性修改（排除 updated_at 变化）
-  IF OLD.title = NEW.title
-    AND OLD.author IS NOT DISTINCT FROM NEW.author
-    AND OLD.description IS NOT DISTINCT FROM NEW.description
-    AND OLD.cover_url IS NOT DISTINCT FROM NEW.cover_url
-    AND OLD.published_date IS NOT DISTINCT FROM NEW.published_date
-  THEN
-    RETURN NEW;
-  END IF;
-
-  -- 创建消息
+  IF NEW.type != 'public' THEN RETURN NEW; END IF;
+  SELECT role, nickname INTO v_updater_role, v_nickname FROM profiles WHERE id = auth.uid();
+  IF v_updater_role != 'admin' THEN RETURN NEW; END IF;
+  IF OLD.title = NEW.title AND OLD.author IS NOT DISTINCT FROM NEW.author AND OLD.description IS NOT DISTINCT FROM NEW.description AND OLD.cover_url IS NOT DISTINCT FROM NEW.cover_url AND OLD.published_date IS NOT DISTINCT FROM NEW.published_date THEN RETURN NEW; END IF;
+  v_nickname := COALESCE(v_nickname, '管理员');
   INSERT INTO messages (type, title, content, related_book_id)
-  VALUES (
-    'book_update',
-    '书籍信息更新',
-    '管理员更新了《' || NEW.title || '》的信息',
-    NEW.id
-  )
+  VALUES ('book_update', '书籍信息更新', v_nickname || ' 更新了《' || NEW.title || '》的信息', NEW.id)
   RETURNING id INTO v_message_id;
-
-  -- 分发给有权查看的用户
   PERFORM distribute_message_to_visible_users(v_message_id, NEW.id);
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -266,42 +221,22 @@ DECLARE
   v_book_type TEXT;
   v_book_title TEXT;
   v_annotator_role TEXT;
+  v_nickname TEXT;
 BEGIN
-  -- 获取书籍信息
-  SELECT type, title INTO v_book_type, v_book_title
-  FROM books
-  WHERE id = NEW.book_id;
-
-  -- 仅处理公共书籍
-  IF v_book_type != 'public' THEN
-    RETURN NEW;
-  END IF;
-
-  -- 检查批注者是否为管理员
-  SELECT role INTO v_annotator_role
-  FROM profiles
-  WHERE id = NEW.user_id;
-
-  IF v_annotator_role != 'admin' THEN
-    RETURN NEW;
-  END IF;
-
-  -- 创建消息
+  SELECT type, title INTO v_book_type, v_book_title FROM books WHERE id = NEW.book_id;
+  IF v_book_type != 'public' THEN RETURN NEW; END IF;
+  SELECT role, nickname INTO v_annotator_role, v_nickname FROM profiles WHERE id = NEW.user_id;
+  IF v_annotator_role != 'admin' THEN RETURN NEW; END IF;
+  v_nickname := COALESCE(v_nickname, '管理员');
   INSERT INTO messages (type, title, content, related_book_id, related_annotation_id, related_page_number)
   VALUES (
-    'annotation',
-    '新批注',
-    '管理员在《' || v_book_title || '》第 ' || NEW.page_number || ' 页添加了' ||
+    'annotation', '新批注',
+    v_nickname || '在《' || v_book_title || '》第 ' || NEW.page_number || ' 页添加了' ||
       CASE WHEN NEW.type = 'highlight' THEN '高亮' ELSE '笔记' END,
-    NEW.book_id,
-    NEW.id,
-    NEW.page_number
+    NEW.book_id, NEW.id, NEW.page_number
   )
   RETURNING id INTO v_message_id;
-
-  -- 分发给有权查看的用户
   PERFORM distribute_message_to_visible_users(v_message_id, NEW.book_id);
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

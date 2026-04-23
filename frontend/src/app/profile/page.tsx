@@ -298,20 +298,25 @@ export default function ProfilePage() {
       setEmailFeedback(null)
 
       try {
-        const { error } = await supabase.auth.updateUser({
-          email: trimmedEmail,
-        })
+        const result = await Promise.race([
+          supabase.auth.updateUser({ email: trimmedEmail }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('请求超时')), 15000)),
+        ])
 
-        if (error) {
-          throw new Error(error.message)
+        if (result.error) {
+          throw new Error(result.error.message)
         }
 
-        setCurrentEmail(trimmedEmail)
-        setEmailFeedback({
-          type: 'success',
-          text: '邮箱修改成功',
-        })
-        setTimeout(() => setEmailFeedback(null), 3000)
+        // 邮箱变更需要确认邮件，不立即更新 currentEmail
+        if ((result.data.user as Record<string, unknown>)?.new_email) {
+          setEmailFeedback({
+            type: 'success',
+            text: '确认邮件已发送到新邮箱，请查收并点击确认链接',
+          })
+        } else {
+          setCurrentEmail(trimmedEmail)
+          setEmailFeedback({ type: 'success', text: '邮箱修改成功' })
+        }
       } catch (err) {
         setEmailFeedback({
           type: 'error',

@@ -242,7 +242,10 @@ export function PdfViewerCore({
         if (!cancelled) onError?.(err?.message || 'PDF 加载失败')
       })
 
-    eventBus.on('pagechanging', (e: { pageNumber: number }) => onPageChange(e.pageNumber))
+    eventBus.on('pagechanging', (e: { pageNumber: number }) => {
+      onPageChange(e.pageNumber)
+      setTimeout(() => renderHighlightsRef.current(), 50)
+    })
     eventBus.on('scalechanging', (e: { scale: number }) => onScaleChange(e.scale))
     eventBus.on('textlayerrendered', () => renderHighlightsRef.current())
     eventBus.on('pagesloaded', () => onLoadComplete?.())
@@ -389,7 +392,10 @@ export function PdfViewerCore({
             highlight={hoveredHighlight}
             onDelete={() => { onHighlightDelete?.(hoveredHighlight.id); setHoveredHighlight(null) }}
             onUpdateComment={(comment) => onHighlightUpdateComment?.(hoveredHighlight.id, comment)}
-            onUpdateColor={(color) => onHighlightUpdateColor?.(hoveredHighlight.id, color)}
+            onUpdateColor={(color) => {
+              onHighlightUpdateColor?.(hoveredHighlight.id, color)
+              setHoveredHighlight({ ...hoveredHighlight, color })
+            }}
           />
         </div>
       )}
