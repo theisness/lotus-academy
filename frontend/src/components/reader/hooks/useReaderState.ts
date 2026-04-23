@@ -40,6 +40,13 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   const [mobileArrowsVisible, setMobileArrowsVisible] = useState(true)
   const [scrolledToHighlightId, setScrolledToHighlightId] = useState<string | null>(null)
 
+  // --- search state ---
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchResults, setSearchResults] = useState<Array<{ page: number; text: string; matchIdx: number }>>([])
+  const [searchActiveIndex, setSearchActiveIndex] = useState(-1)
+  const [searchSearching, setSearchSearching] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
   const [scrollType, setScrollType] = useState<'scroll' | 'page'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('reader-scroll-type')
@@ -217,6 +224,101 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     applyViewerModes(scrollType, mode)
   }, [scrollType, applyViewerModes])
 
+  // --- search callbacks ---
+
+  const handleSearch = useCallback(async (query: string) => {
+    const doc = pdfDocumentRef.current
+    if (!doc || !query.trim()) {
+      setSearchResults([])
+      setSearchActiveIndex(-1)
+      setSearchQuery('')
+      // clear pdfjs highlight
+      const viewer = highlighterUtilsRef.current?.getViewer()
+      viewer?.eventBus?.dispatch('findbarclose', { source: null })
+      return
+    }
+    setSearchSearching(true)
+    setSearchQuery(query.trim())
+    const q = query.toLowerCase()
+    const results: Array<{ page: number; text: string; matchIdx: number }> = []
+    const CONTEXT = 30
+
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i)
+      const content = await page.getTextContent()
+      const pageText = content.items
+        .map((item) => ('str' in item ? item.str : ''))
+        .join('')
+      let start = 0
+      let matchIdx = 0
+      const lower = pageText.toLowerCase()
+      while (true) {
+        const idx = lower.indexOf(q, start)
+        if (idx === -1) break
+        const snippetStart = Math.max(0, idx - CONTEXT)
+        const snippetEnd = Math.min(pageText.length, idx + query.length + CONTEXT)
+        const snippet =
+          (snippetStart > 0 ? '…' : '') +
+          pageText.slice(snippetStart, snippetEnd) +
+          (snippetEnd < pageText.length ? '…' : '')
+        results.push({ page: i, text: snippet, matchIdx })
+        start = idx + 1
+        matchIdx++
+      }
+    }
+
+    setSearchResults(results)
+    setSearchActiveIndex(results.length > 0 ? 0 : -1)
+    setSearchSearching(false)
+
+    // trigger pdfjs find highlight
+    if (results.length > 0) {
+      const viewer = highlighterUtilsRef.current?.getViewer()
+      viewer?.eventBus?.dispatch('find', {
+        source: null, type: '', query: query.trim(),
+        caseSensitive: false, entireWord: false,
+        highlightAll: true, findPrevious: false, matchDiacritics: false,
+      })
+    }
+  }, [])
+
+  const handleSearchJump = useCallback((index: number) => {
+    const r = searchResults[index]
+    if (!r) return
+    setSearchActiveIndex(index)
+    handlePageChange(r.page)
+    // sync pdfjs findController selected highlight
+    const viewer = highlighterUtilsRef.current?.getViewer()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fc = viewer?.findController as any
+    if (fc?._selected) {
+      fc._selected.pageIdx = r.page - 1
+      fc._selected.matchIdx = r.matchIdx
+      viewer!.eventBus.dispatch('updatetextlayermatches', { source: null, pageIndex: -1 })
+    }
+  }, [searchResults, handlePageChange])
+
+  const handleSearchClose = useCallback(() => {
+    setSearchOpen(false)
+    setSearchResults([])
+    setSearchActiveIndex(-1)
+    const viewer = highlighterUtilsRef.current?.getViewer()
+    viewer?.eventBus?.dispatch('findbarclose', { source: null })
+  }, [])
+
+  const handleToggleSearch = useCallback(() => {
+    setSearchOpen((prev) => {
+      if (prev) {
+        // closing
+        setSearchResults([])
+        setSearchActiveIndex(-1)
+        const viewer = highlighterUtilsRef.current?.getViewer()
+        viewer?.eventBus?.dispatch('findbarclose', { source: null })
+      }
+      return !prev
+    })
+  }, [])
+
   return {
     // refs
     highlighterUtilsRef,
@@ -258,5 +360,15 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     handleScrollTypeChange,
     handleDisplayModeChange,
     applyViewerModes,
+    // search
+    searchOpen,
+    searchResults,
+    searchActiveIndex,
+    searchSearching,
+    searchQuery,
+    handleSearch,
+    handleSearchJump,
+    handleSearchClose,
+    handleToggleSearch,
   }
 }

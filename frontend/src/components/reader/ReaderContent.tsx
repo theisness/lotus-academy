@@ -7,6 +7,7 @@ import type { PdfHighlighterUtils } from 'react-pdf-highlighter-extended'
 import { SpinnerGap, WarningCircle, CaretLeft, CaretRight, X } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { OutlinePanel } from './OutlinePanel'
+import { SearchPanel } from './SearchPanel'
 import { AnnotationPanel } from './AnnotationPanel'
 import { NotePanel } from './NotePanel'
 import { SelectionTip } from './SelectionTip'
@@ -61,6 +62,13 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
     handlePageChange,
     handleScrollToHighlight,
     totalPages,
+    searchOpen,
+    searchResults,
+    searchActiveIndex,
+    searchSearching,
+    searchQuery,
+    handleSearch,
+    handleSearchJump,
   } = state
 
   return (
@@ -74,6 +82,21 @@ export function ReaderContent({ fileUrl, canAnnotate, state }: ReaderContentProp
           <OutlinePanel
             pdfDocument={pdfDocumentRef.current}
             onPageChange={handlePageChange}
+          />
+        </div>
+      )}
+
+      {/* 搜索边栏 */}
+      {searchOpen && (
+        <div className="w-full sm:w-72 shrink-0 border-r border-zinc-700 bg-zinc-800/50
+          overflow-hidden flex flex-col absolute sm:relative inset-0 sm:inset-auto z-30 sm:z-auto">
+          <SearchPanel
+            results={searchResults}
+            searching={searchSearching}
+            activeIndex={searchActiveIndex}
+            query={searchQuery}
+            onSearch={handleSearch}
+            onJump={handleSearchJump}
           />
         </div>
       )}

@@ -15,6 +15,7 @@ import {
   BookOpenText,
   BookOpen,
   List,
+  MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { HIGHLIGHT_COLORS } from './PdfReader'
 
@@ -61,6 +62,8 @@ interface ReaderToolbarProps {
   displayMode: 'single' | 'double'
   onScrollTypeChange: (type: 'scroll' | 'page') => void
   onDisplayModeChange: (mode: 'single' | 'double') => void
+  searchOpen: boolean
+  onToggleSearch: () => void
 }
 
 const SCALE_STEPS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
@@ -96,6 +99,8 @@ export function ReaderToolbar({
   displayMode,
   onScrollTypeChange,
   onDisplayModeChange,
+  searchOpen,
+  onToggleSearch,
 }: ReaderToolbarProps) {
   const [pageInput, setPageInput] = useState(String(currentPage))
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -392,6 +397,21 @@ export function ReaderToolbar({
             </AnimatePresence>
           </div>
         )}
+
+        {/* 搜索按钮 */}
+        <button
+          onClick={onToggleSearch}
+          className={`flex h-8 w-8 items-center justify-center rounded-lg
+            transition-colors active:scale-[0.98]
+            ${searchOpen
+              ? 'bg-zinc-700 text-zinc-200'
+              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+            }`}
+          aria-label="搜索内容"
+          title="搜索 (Ctrl+F)"
+        >
+          <MagnifyingGlass size={18} weight="regular" />
+        </button>
 
         {/* 章节目录切换 */}
         <button

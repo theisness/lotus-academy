@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { GlobalWorkerOptions } from 'pdfjs-dist'
 import { ReaderToolbar } from './ReaderToolbar'
 import { ReaderContent } from './ReaderContent'
@@ -34,6 +35,20 @@ export function PdfReader({
 }: PdfReaderProps) {
   const state = useReaderState(bookId, canAnnotate)
 
+  const { searchOpen, handleToggleSearch } = state
+
+  // Ctrl+F / Cmd+F 打开搜索
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        if (!searchOpen) handleToggleSearch()
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [searchOpen, handleToggleSearch])
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900">
       <ReaderToolbar
@@ -57,6 +72,8 @@ export function PdfReader({
         displayMode={state.displayMode}
         onScrollTypeChange={state.handleScrollTypeChange}
         onDisplayModeChange={state.handleDisplayModeChange}
+        searchOpen={state.searchOpen}
+        onToggleSearch={state.handleToggleSearch}
       />
       <ReaderContent fileUrl={fileUrl} canAnnotate={canAnnotate} state={state} />
     </div>

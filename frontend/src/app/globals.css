@@ -93,3 +93,30 @@ body {
   justify-content: center;
   min-height: 100%;
 }
+
+/* PDF 搜索高亮 — pdfjs findController */
+.textLayer .highlight {
+  background-color: rgba(234, 179, 8, 0.4) !important;
+  mix-blend-mode: normal !important;
+  margin: -1px;
+  padding: 1px;
+  border-radius: 4px;
+}
+.textLayer .highlight.appended {
+  position: initial;
+}
+.textLayer .highlight.begin {
+  border-radius: 4px 0 0 4px;
+}
+.textLayer .highlight.end {
+  border-radius: 0 4px 4px 0;
+}
+.textLayer .highlight.middle {
+  border-radius: 0;
+}
+.textLayer .highlight.selected {
+  background-color: rgba(251, 146, 60, 0.6) !important;
+}
+.textLayer.highlighting {
+  touch-action: none;
+}
