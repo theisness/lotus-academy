@@ -161,8 +161,11 @@ export function ReaderContent({ fileUrl, canAnnotate, canNote, canComment, state
           onScrollAway={() => setScrolledToHighlightId(null)}
           onLoadComplete={() => {
             setIsLoading(false)
-            if (viewerRef.current?.currentScale) {
-              setActualScale(viewerRef.current.currentScale)
+            const v = viewerRef.current
+            if (v) {
+              v.scrollMode = scrollType === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
+              v.spreadMode = displayMode === 'double' ? SpreadMode.ODD : SpreadMode.NONE
+              if (v.currentScale) setActualScale(v.currentScale)
             }
           }}
           onError={(err) => {
