@@ -234,11 +234,18 @@ export function useBooks(type: ShelfType): UseBooksReturn {
         throw new Error(`书籍删除失败: ${deleteError.message}`)
       }
 
-      // 删除 Storage 中的文件
+      // 删除 Storage 中的文件（仅当无其他书籍引用同一文件时）
       if (bookToDelete?.file_path) {
-        await supabase.storage
+        const { count } = await supabase
           .from('books')
-          .remove([bookToDelete.file_path])
+          .select('id', { count: 'exact', head: true })
+          .eq('file_path', bookToDelete.file_path)
+
+        if (count === 0) {
+          await supabase.storage
+            .from('books')
+            .remove([bookToDelete.file_path])
+        }
       }
 
       // 更新本地状态

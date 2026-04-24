@@ -4,6 +4,16 @@
 -- ============================================================
 
 -- ============================================================
+-- 0. is_admin() — 基于 profiles 表的管理员检查
+-- ============================================================
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+  );
+$$ LANGUAGE sql SECURITY DEFINER SET search_path TO 'public';
+
+-- ============================================================
 -- 1. handle_new_user() — 新用户注册时自动创建 profiles 记录
 --    首位用户自动设为 admin
 -- ============================================================
@@ -243,6 +253,25 @@ CREATE TRIGGER on_public_book_annotation
   AFTER INSERT ON annotations
   FOR EACH ROW
   EXECUTE FUNCTION notify_public_book_annotation();
+
+-- ============================================================
+-- sync_user_email() — 同步 auth.users 邮箱到 profiles.email
+-- ============================================================
+CREATE OR REPLACE FUNCTION sync_user_email()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.profiles
+  SET email = NEW.email, updated_at = now()
+  WHERE id = NEW.id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_email_changed
+  AFTER UPDATE OF email ON auth.users
+  FOR EACH ROW
+  WHEN (OLD.email IS DISTINCT FROM NEW.email)
+  EXECUTE FUNCTION sync_user_email();
 
 -- ============================================================
 -- 复制公共书籍到个人书架

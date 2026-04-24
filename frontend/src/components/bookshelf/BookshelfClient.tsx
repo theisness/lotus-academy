@@ -362,15 +362,15 @@ updateBook,
       className="py-6 md:py-8"
     >
       {/* Header row: search + upload (admin) + display settings */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5">
-        <div className="flex-1 w-full sm:max-w-sm">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="min-w-0 flex-1 max-w-sm">
           <SearchBar
             value={searchValue}
             onChange={handleSearch}
             placeholder="搜索书籍名称..."
           />
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           {isAdmin && (
             <BookUploadButton shelfType="public" onUpload={handleFileSelected} />
           )}

@@ -66,6 +66,7 @@ export function PrivateBookshelfClient() {
     searchBooks,
     uploadBook,
     updateBook,
+    deleteBook,
     reorderBooks,
   } = useBooks('private')
   const { categories, loading: categoriesLoading, createCategory, updateCategory, deleteCategory, addBookToCategory, removeBookFromCategory } = useCategories('private')
@@ -263,15 +264,15 @@ export function PrivateBookshelfClient() {
       className="py-6 md:py-8"
     >
       {/* Header row: search + upload + display settings */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5">
-        <div className="flex-1 w-full sm:max-w-sm">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="min-w-0 flex-1 max-w-sm">
           <SearchBar
             value={searchValue}
             onChange={handleSearch}
             placeholder="搜索我的书籍..."
           />
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <BookUploadButton shelfType="private" onUpload={handleFileSelected} />
           <button
             type="button"
@@ -496,6 +497,7 @@ export function PrivateBookshelfClient() {
           open={!!editingBook}
           onClose={handleEditClose}
           onSave={handleEditSave}
+          onDelete={async (id) => { await deleteBook(id); setEditingBook(null) }}
         />
       )}
 

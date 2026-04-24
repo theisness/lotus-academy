@@ -13,6 +13,7 @@ CREATE TABLE profiles (
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
   group_tags TEXT[] NOT NULL DEFAULT '{}',
   page_preference TEXT CHECK (page_preference IN ('public', 'private')),
+  email TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -34,7 +35,8 @@ CREATE TABLE books (
   uploader_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   published_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sort_order INTEGER DEFAULT 0
 );
 
 COMMENT ON TABLE books IS '书籍表';
