@@ -56,6 +56,7 @@ export interface PdfViewerCoreProps {
   onScrollAway?: () => void
   onLoadComplete?: () => void
   onError?: (error: string) => void
+  initialPage?: number
 }
 
 export function PdfViewerCore({
@@ -81,6 +82,7 @@ export function PdfViewerCore({
   onScrollAway,
   onLoadComplete,
   onError,
+  initialPage,
 }: PdfViewerCoreProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -251,7 +253,16 @@ export function PdfViewerCore({
     })
     eventBus.on('scalechanging', (e: { scale: number }) => onScaleChange(e.scale))
     eventBus.on('textlayerrendered', () => renderHighlightsRef.current())
-    eventBus.on('pagesloaded', () => onLoadComplete?.())
+    eventBus.on('pagesloaded', () => {
+      if (initialPage && initialPage > 1 && initialPage <= numPagesRef.current) {
+        console.log('[PdfViewer] pagesloaded: setting page', initialPage)
+        viewer.currentPageNumber = initialPage
+      }
+      // Apply initial scale after pages are rendered
+      console.log('[PdfViewer] pagesloaded: applying scale', scale)
+      viewer.currentScaleValue = String(scale)
+      onLoadComplete?.()
+    })
 
     const roots = highlightRootsRef.current
     return () => {
@@ -269,6 +280,7 @@ export function PdfViewerCore({
   // --- Scale ---
   useEffect(() => {
     if (viewerRef.current) {
+      console.log('[PdfViewer] applying scale', scale)
       viewerRef.current.currentScaleValue = String(scale)
     }
   }, [scale])

@@ -163,6 +163,14 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
     router.back()
   }, [router])
 
+  const handleCopyToPersonal = useCallback(async () => {
+    if (!book || !user) return
+    const supabase = createClient()
+    const { error } = await supabase.rpc('copy_book_to_personal', { p_book_id: bookId })
+    if (error) { alert('复制失败: ' + error.message); return }
+    alert('已复制到个人书架')
+  }, [book, user, bookId])
+
   // 加载中状态
   if (loading || authLoading) {
     return (
@@ -247,6 +255,7 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
       currentUserNickname={user?.nickname ?? user?.email ?? undefined}
       bookTitle={book.title}
       onBack={handleBack}
+      onCopyToPersonal={book.type === 'public' && user ? handleCopyToPersonal : undefined}
     />
   )
 }

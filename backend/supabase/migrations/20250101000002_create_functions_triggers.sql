@@ -243,3 +243,30 @@ CREATE TRIGGER on_public_book_annotation
   AFTER INSERT ON annotations
   FOR EACH ROW
   EXECUTE FUNCTION notify_public_book_annotation();
+
+-- ============================================================
+-- 复制公共书籍到个人书架
+-- ============================================================
+CREATE OR REPLACE FUNCTION copy_book_to_personal(p_book_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_new_id UUID;
+  v_uid UUID := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION '未登录';
+  END IF;
+
+  INSERT INTO books (title, author, description, cover_url, file_path, type, uploader_id, published_date)
+  SELECT title, author, description, cover_url, file_path, 'private', v_uid, published_date
+  FROM books
+  WHERE id = p_book_id AND type = 'public'
+  RETURNING id INTO v_new_id;
+
+  IF v_new_id IS NULL THEN
+    RAISE EXCEPTION '书籍不存在或非公共书籍';
+  END IF;
+
+  RETURN v_new_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

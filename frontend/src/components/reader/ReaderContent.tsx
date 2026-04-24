@@ -33,6 +33,7 @@ export function ReaderContent({ fileUrl, canAnnotate, canNote, canComment, state
     setTotalPages,
     scale,
     setScale,
+    setActualScale,
     activeColor,
     sidePanelOpen,
     setSidePanelOpen,
@@ -73,6 +74,8 @@ export function ReaderContent({ fileUrl, canAnnotate, canNote, canComment, state
     setSearchInputQuery,
     handleSearch,
     handleSearchJump,
+    saveState,
+    applyViewerModes,
   } = state
 
   return (
@@ -139,10 +142,13 @@ export function ReaderContent({ fileUrl, canAnnotate, canNote, canComment, state
           onDocumentLoad={(doc) => { pdfDocumentRef.current = doc }}
           onViewerReady={(viewer) => {
             viewerRef.current = viewer
+            // Apply saved scroll/display modes
+            viewer.scrollMode = scrollType === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
+            viewer.spreadMode = displayMode === 'double' ? SpreadMode.ODD : SpreadMode.NONE
           }}
-          onPageChange={setCurrentPage}
+          onPageChange={(p) => { setCurrentPage(p); saveState({ currentPage: p }) }}
           onTotalPages={setTotalPages}
-          onScaleChange={(s) => setScale(s)}
+          onScaleChange={(s) => { setScale(s); setActualScale(s) }}
           onSelection={(position, text) => {
             handleSelection(position, text)
             handleCreateHighlight()
@@ -155,19 +161,15 @@ export function ReaderContent({ fileUrl, canAnnotate, canNote, canComment, state
           onScrollAway={() => setScrolledToHighlightId(null)}
           onLoadComplete={() => {
             setIsLoading(false)
-            const v = viewerRef.current
-            if (v) {
-              v.scrollMode = scrollType === 'scroll' ? ScrollMode.VERTICAL : ScrollMode.PAGE
-              v.spreadMode = displayMode === 'double' ? SpreadMode.ODD : SpreadMode.NONE
+            if (viewerRef.current?.currentScale) {
+              setActualScale(viewerRef.current.currentScale)
             }
-            setTimeout(() => {
-              if (viewerRef.current?.currentScale) setScale(viewerRef.current.currentScale)
-            }, 100)
           }}
           onError={(err) => {
             setIsLoading(false)
             console.error('[PdfReader] Load error:', err)
           }}
+          initialPage={currentPage}
         />
 
         {/* 边缘翻页箭头（仅在单屏切换模式显示） */}

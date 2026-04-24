@@ -12,7 +12,7 @@ export { HIGHLIGHT_COLORS } from './constants'
 
 GlobalWorkerOptions.workerSrc = '/pdf-worker/pdf.worker.min.mjs'
 
-export function PdfReader({ bookId, fileUrl, canAnnotate, canNote, canComment, currentUserNickname, bookTitle, onBack }: PdfReaderProps) {
+export function PdfReader({ bookId, fileUrl, canAnnotate, canNote, canComment, currentUserNickname, bookTitle, onBack, onCopyToPersonal }: PdfReaderProps) {
   const state = useReaderState(bookId, canAnnotate)
   const { searchOpen, handleToggleSearch } = state
 
@@ -62,6 +62,7 @@ export function PdfReader({ bookId, fileUrl, canAnnotate, canNote, canComment, c
         onDisplayModeChange={state.handleDisplayModeChange}
         searchOpen={state.searchOpen}
         onToggleSearch={state.handleToggleSearch}
+        onCopyToPersonal={onCopyToPersonal}
       />
       <ReaderContent fileUrl={fileUrl} canAnnotate={canAnnotate} canNote={canNote} canComment={canComment ?? false} currentUserNickname={currentUserNickname} state={state} />
     </div>

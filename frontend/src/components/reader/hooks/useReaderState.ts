@@ -16,9 +16,14 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   const pendingSelectionRef = useRef<{ position: AnnotationPosition; text: string } | null>(null)
   const pdfDocumentRef = useRef<import('pdfjs-dist').PDFDocumentProxy | null>(null)
 
-  const [currentPage, setCurrentPage] = useState(1)
+  const storageKey = `reader-state-${bookId}`
+  const savedState = typeof window !== 'undefined'
+    ? (() => { try { const s = JSON.parse(localStorage.getItem(storageKey) || '{}'); console.log('[ReaderState] restore', storageKey, s); return s } catch { return {} } })()
+    : {}
+
+  const [currentPage, setCurrentPage] = useState(savedState.currentPage || 1)
   const [totalPages, setTotalPages] = useState(0)
-  const [scale, setScale] = useState<number | string>('page-width')
+  const [scale, setScale] = useState<number | string>(savedState.scale || 'page-width')
   const [activeColor, setActiveColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(COLOR_STORAGE_KEY)
@@ -41,21 +46,22 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchInputQuery, setSearchInputQuery] = useState('')
 
-  const [scrollType, setScrollType] = useState<'scroll' | 'page'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('reader-scroll-type')
-      if (saved === 'scroll' || saved === 'page') return saved
-    }
-    return 'scroll'
-  })
+  const saveState = useCallback((patch: Record<string, unknown>) => {
+    try {
+      const cur = JSON.parse(localStorage.getItem(storageKey) || '{}')
+      const next = { ...cur, ...patch }
+      console.log('[ReaderState] save', storageKey, patch, '->', next)
+      localStorage.setItem(storageKey, JSON.stringify(next))
+    } catch {}
+  }, [storageKey])
 
-  const [displayMode, setDisplayMode] = useState<'single' | 'double'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('reader-display-mode')
-      if (saved === 'single' || saved === 'double') return saved
-    }
-    return 'single'
-  })
+  const [scrollType, setScrollType] = useState<'scroll' | 'page'>(
+    savedState.scrollType || 'scroll'
+  )
+
+  const [displayMode, setDisplayMode] = useState<'single' | 'double'>(
+    savedState.displayMode || 'single'
+  )
 
   // --- derived data ---
 
@@ -76,7 +82,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     return annotations.filter((ann) => ann.type === 'note')
   }, [annotations])
 
-  const actualScale = viewerRef.current?.currentScale ?? 1.0
+  const [actualScale, setActualScale] = useState(1.0)
 
   // --- callbacks ---
 
@@ -200,12 +206,15 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   const handlePageChange = useCallback((page: number) => {
     if (page < 1 || page > totalPages) return
     setCurrentPage(page)
+    saveState({ currentPage: page })
     if (viewerRef.current) viewerRef.current.currentPageNumber = page
-  }, [totalPages])
+  }, [totalPages, saveState])
 
   const handleScaleChange = useCallback((newScale: number) => {
     setScale(newScale)
-  }, [])
+    setActualScale(newScale)
+    saveState({ scale: newScale })
+  }, [saveState])
 
   const applyViewerModes = useCallback((scroll: 'scroll' | 'page', display: 'single' | 'double') => {
     const viewer = viewerRef.current
@@ -221,15 +230,15 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
 
   const handleScrollTypeChange = useCallback((type: 'scroll' | 'page') => {
     setScrollType(type)
-    try { localStorage.setItem('reader-scroll-type', type) } catch {}
+    saveState({ scrollType: type })
     applyViewerModes(type, displayMode)
-  }, [displayMode, applyViewerModes])
+  }, [displayMode, applyViewerModes, saveState])
 
   const handleDisplayModeChange = useCallback((mode: 'single' | 'double') => {
     setDisplayMode(mode)
-    try { localStorage.setItem('reader-display-mode', mode) } catch {}
+    saveState({ displayMode: mode })
     applyViewerModes(scrollType, mode)
-  }, [scrollType, applyViewerModes])
+  }, [scrollType, applyViewerModes, saveState])
 
   // --- search callbacks ---
 
@@ -319,7 +328,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     mobileArrowsVisible, setMobileArrowsVisible,
     scrolledToHighlightId, setScrolledToHighlightId,
     scrollType, displayMode,
-    highlights, allNotes, actualScale,
+    highlights, allNotes, actualScale, setActualScale,
     handleColorChange, handleScrollToHighlight,
     handleSelection, handleCreateHighlight, handleCancelSelection, handleCreateComment,
     handlePrevPage, handleNextPage,
@@ -329,5 +338,6 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
     handleScrollTypeChange, handleDisplayModeChange, applyViewerModes,
     searchOpen, searchResults, searchActiveIndex, searchSearching, searchQuery, searchInputQuery, setSearchInputQuery,
     handleSearch, handleSearchJump, handleSearchClose, handleToggleSearch,
+    saveState,
   }
 }
