@@ -220,14 +220,12 @@ DECLARE
   v_message_id UUID;
   v_book_type TEXT;
   v_book_title TEXT;
-  v_annotator_role TEXT;
   v_nickname TEXT;
 BEGIN
   SELECT type, title INTO v_book_type, v_book_title FROM books WHERE id = NEW.book_id;
   IF v_book_type != 'public' THEN RETURN NEW; END IF;
-  SELECT role, nickname INTO v_annotator_role, v_nickname FROM profiles WHERE id = NEW.user_id;
-  IF v_annotator_role != 'admin' THEN RETURN NEW; END IF;
-  v_nickname := COALESCE(v_nickname, '管理员');
+  SELECT nickname INTO v_nickname FROM profiles WHERE id = NEW.user_id;
+  v_nickname := COALESCE(v_nickname, '用户');
   INSERT INTO messages (type, title, content, related_book_id, related_annotation_id, related_page_number)
   VALUES (
     'annotation', '新批注',

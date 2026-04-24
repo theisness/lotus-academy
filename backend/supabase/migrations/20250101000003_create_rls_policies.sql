@@ -334,3 +334,9 @@ CREATE POLICY user_messages_update ON user_messages
   ) WITH CHECK (
     user_id = auth.uid()
   );
+
+-- DELETE: 用户仅可删除自己的消息
+CREATE POLICY user_messages_delete ON user_messages
+  FOR DELETE USING (
+    user_id = auth.uid()
+  );
