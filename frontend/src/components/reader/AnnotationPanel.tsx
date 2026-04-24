@@ -206,7 +206,8 @@ export function AnnotationPanel({
                 {items.map((ann) => (
                   <div
                     key={ann.id}
-                    className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-2.5 group"
+                    className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-2.5 group cursor-pointer"
+                    onClick={() => onScrollTo(ann.id)}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <div

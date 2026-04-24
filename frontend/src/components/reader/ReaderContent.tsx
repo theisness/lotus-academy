@@ -9,6 +9,7 @@ import { SearchPanel } from './SearchPanel'
 import { AnnotationPanel } from './AnnotationPanel'
 import { NotePanel } from './NotePanel'
 import { PdfViewerCore } from './PdfViewerCore'
+import { useAuthContext } from '@/components/providers/AuthProvider'
 import type { useReaderState } from './hooks/useReaderState'
 
 type ReaderState = ReturnType<typeof useReaderState>
@@ -16,12 +17,14 @@ type ReaderState = ReturnType<typeof useReaderState>
 interface ReaderContentProps {
   fileUrl: string
   canAnnotate: boolean
+  canNote?: boolean
   canComment: boolean
   currentUserNickname?: string
   state: ReaderState
 }
 
-export function ReaderContent({ fileUrl, canAnnotate, canComment, state }: ReaderContentProps) {
+export function ReaderContent({ fileUrl, canAnnotate, canNote, canComment, state }: ReaderContentProps) {
+  const { user } = useAuthContext()
   const {
     viewerRef,
     pdfDocumentRef,
@@ -130,6 +133,7 @@ export function ReaderContent({ fileUrl, canAnnotate, canComment, state }: Reade
           displayMode={displayMode}
           canAnnotate={canAnnotate}
           canComment={canComment}
+          currentUserId={user?.id}
           activeColor={activeColor}
           scrolledToHighlightId={scrolledToHighlightId}
           onDocumentLoad={(doc) => { pdfDocumentRef.current = doc }}
@@ -243,7 +247,9 @@ export function ReaderContent({ fileUrl, canAnnotate, canComment, state }: Reade
                 <NotePanel
                   notes={allNotes}
                   currentPage={currentPage}
-                  canAnnotate={canAnnotate}
+                  canAnnotate={canNote ?? canAnnotate}
+                  currentUserId={user?.id}
+                  isAdmin={canAnnotate}
                   onAddNote={handleAddNote}
                   onUpdateNote={handleUpdateNote}
                   onDeleteNote={handleDeleteNote}

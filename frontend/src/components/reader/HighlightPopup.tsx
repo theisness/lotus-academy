@@ -6,12 +6,13 @@ import { HIGHLIGHT_COLORS } from './constants'
 
 interface HighlightPopupProps {
   highlight: { id: string; color: string; comment: string }
+  isOwner?: boolean
   onDelete: () => void
   onUpdateComment: (comment: string) => void
   onUpdateColor?: (color: string) => void
 }
 
-export function HighlightPopup({ highlight, onDelete, onUpdateComment, onUpdateColor }: HighlightPopupProps) {
+export function HighlightPopup({ highlight, isOwner = true, onDelete, onUpdateComment, onUpdateColor }: HighlightPopupProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [commentDraft, setCommentDraft] = useState(highlight.comment || '')
 
@@ -51,12 +52,12 @@ export function HighlightPopup({ highlight, onDelete, onUpdateComment, onUpdateC
       ) : (
         <div>
           {highlight.comment && (
-            <div className="px-3 py-2 border-b border-zinc-700/50">
+            <div className={`px-3 py-2 ${isOwner ? 'border-b border-zinc-700/50' : ''}`}>
               <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">{highlight.comment}</p>
             </div>
           )}
           {/* 颜色选择 */}
-          {onUpdateColor && (
+          {isOwner && onUpdateColor && (
             <div className="flex items-center gap-1.5 px-3 py-2 border-b border-zinc-700/50">
               {HIGHLIGHT_COLORS.map((c) => (
                 <button
@@ -72,6 +73,7 @@ export function HighlightPopup({ highlight, onDelete, onUpdateComment, onUpdateC
               ))}
             </div>
           )}
+          {isOwner && (
           <div className="flex items-center gap-0.5 p-1">
             <button
               onClick={() => setIsEditing(true)}
@@ -88,6 +90,7 @@ export function HighlightPopup({ highlight, onDelete, onUpdateComment, onUpdateC
               <span>删除</span>
             </button>
           </div>
+          )}
         </div>
       )}
     </div>

@@ -23,6 +23,8 @@ interface NotePanelProps {
   notes: Annotation[]
   currentPage: number
   canAnnotate: boolean
+  currentUserId?: string
+  isAdmin?: boolean
   onAddNote: (content: string) => Promise<void>
   onUpdateNote: (noteId: string, content: string) => Promise<void>
   onDeleteNote: (noteId: string) => Promise<void>
@@ -35,6 +37,8 @@ export function NotePanel({
   notes,
   currentPage,
   canAnnotate,
+  currentUserId,
+  isAdmin,
   onAddNote,
   onUpdateNote,
   onDeleteNote,
@@ -252,7 +256,7 @@ export function NotePanel({
                                 })}
                               </span>
                             </div>
-                            {canAnnotate && (
+                            {(isAdmin || note.user_id === currentUserId) && (
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                   onClick={() => { setEditingId(note.id); setEditContent(note.content || '') }}

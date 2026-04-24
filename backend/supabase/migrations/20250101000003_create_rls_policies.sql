@@ -120,7 +120,7 @@ CREATE POLICY annotations_select ON annotations
     )
   );
 
--- INSERT: 私有书籍 → 仅书籍所有者；公共书籍 → 所有登录用户
+-- INSERT: 私有书籍 → 仅书籍所有者；公共书籍 → 管理员可插入任何类型，普通用户只能插入笔记
 CREATE POLICY annotations_insert ON annotations
   FOR INSERT WITH CHECK (
     auth.uid() = user_id
@@ -129,23 +129,44 @@ CREATE POLICY annotations_insert ON annotations
       WHERE b.id = book_id
         AND (
           (b.type = 'private' AND b.uploader_id = auth.uid())
-          OR (b.type = 'public' AND auth.uid() IS NOT NULL)
+          OR (b.type = 'public' AND (
+            EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+            OR (auth.uid() IS NOT NULL AND annotations.type = 'note')
+          ))
         )
     )
   );
 
--- UPDATE: 仅批注所有者可修改自己的批注
+-- UPDATE: 私有书籍 → 仅批注所有者；公共书籍 → 管理员可改任何人的，普通用户只能改自己的笔记
 CREATE POLICY annotations_update ON annotations
   FOR UPDATE USING (
-    user_id = auth.uid()
-  ) WITH CHECK (
-    user_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM books b
+      WHERE b.id = annotations.book_id
+        AND (
+          (b.type = 'private' AND b.uploader_id = auth.uid() AND annotations.user_id = auth.uid())
+          OR (b.type = 'public' AND (
+            EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+            OR (annotations.user_id = auth.uid() AND annotations.type = 'note')
+          ))
+        )
+    )
   );
 
--- DELETE: 仅批注所有者可删除自己的批注
+-- DELETE: 私有书籍 → 仅批注所有者；公共书籍 → 管理员可删任何人的，普通用户只能删自己的笔记
 CREATE POLICY annotations_delete ON annotations
   FOR DELETE USING (
-    user_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM books b
+      WHERE b.id = annotations.book_id
+        AND (
+          (b.type = 'private' AND b.uploader_id = auth.uid() AND annotations.user_id = auth.uid())
+          OR (b.type = 'public' AND (
+            EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+            OR (annotations.user_id = auth.uid() AND annotations.type = 'note')
+          ))
+        )
+    )
   );
 
 -- ============================================================

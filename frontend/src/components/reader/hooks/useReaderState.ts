@@ -68,6 +68,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
         color: ann.color || DEFAULT_COLOR,
         comment: ann.content || '',
         annotationId: ann.id,
+        userId: ann.user_id,
       }))
   }, [annotations])
 
@@ -117,7 +118,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
         content: null,
         page_number: position.pageNumber,
       })
-    } catch {}
+    } catch (err) { console.error('[highlight] create failed:', err) }
     pendingSelectionRef.current = null
   }, [canAnnotate, addAnnotation, activeColor])
 
@@ -172,7 +173,7 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
   }, [canAnnotate, updateAnnotation])
 
   const handleAddNote = useCallback(async (content: string) => {
-    if (!canAnnotate || !content.trim()) return
+    if (!content.trim()) return
     try {
       await addAnnotation({
         type: 'note',
@@ -186,17 +187,15 @@ export function useReaderState(bookId: string, canAnnotate: boolean) {
         page_number: currentPage,
       })
     } catch {}
-  }, [canAnnotate, addAnnotation, currentPage])
+  }, [addAnnotation, currentPage])
 
   const handleUpdateNote = useCallback(async (noteId: string, content: string) => {
-    if (!canAnnotate) return
     try { await updateAnnotation(noteId, { content: content.trim() || null }) } catch {}
-  }, [canAnnotate, updateAnnotation])
+  }, [updateAnnotation])
 
   const handleDeleteNote = useCallback(async (noteId: string) => {
-    if (!canAnnotate) return
     try { await deleteAnnotation(noteId) } catch {}
-  }, [canAnnotate, deleteAnnotation])
+  }, [deleteAnnotation])
 
   const handlePageChange = useCallback((page: number) => {
     if (page < 1 || page > totalPages) return

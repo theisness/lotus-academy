@@ -152,10 +152,12 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
    */
   const canAnnotate = (() => {
     if (!book || !user) return false
-    if (book.type === 'public') return true
+    if (book.type === 'public') return isAdmin
     if (book.type === 'private') return book.uploader_id === user.id
     return false
   })()
+
+  const canNote = !!user && !!book
 
   const handleBack = useCallback(() => {
     router.back()
@@ -240,6 +242,7 @@ export function ReaderClient({ bookId }: ReaderClientProps) {
       bookId={bookId}
       fileUrl={fileUrl}
       canAnnotate={canAnnotate}
+      canNote={canNote}
       canComment={!!user}
       currentUserNickname={user?.nickname ?? user?.email ?? undefined}
       bookTitle={book.title}

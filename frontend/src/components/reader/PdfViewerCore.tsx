@@ -26,6 +26,7 @@ interface ReaderHighlight {
   color: string
   comment: string
   annotationId: string
+  userId?: string
 }
 
 export interface PdfViewerCoreProps {
@@ -36,6 +37,7 @@ export interface PdfViewerCoreProps {
   displayMode: 'single' | 'double'
   canAnnotate: boolean
   canComment: boolean
+  currentUserId?: string
   activeColor: string
   scrolledToHighlightId: string | null
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -62,6 +64,7 @@ export function PdfViewerCore({
   highlights,
   canAnnotate,
   canComment,
+  currentUserId,
   activeColor,
   scrolledToHighlightId,
   onDocumentLoad,
@@ -390,6 +393,7 @@ export function PdfViewerCore({
         >
           <HighlightPopup
             highlight={hoveredHighlight}
+            isOwner={!currentUserId || hoveredHighlight.userId === currentUserId}
             onDelete={() => { onHighlightDelete?.(hoveredHighlight.id); setHoveredHighlight(null) }}
             onUpdateComment={(comment) => onHighlightUpdateComment?.(hoveredHighlight.id, comment)}
             onUpdateColor={(color) => {
@@ -400,7 +404,7 @@ export function PdfViewerCore({
         </div>
       )}
 
-      <style>{`.pdf-viewer-core .textLayer ::selection { background: ${canAnnotate ? activeColor : 'transparent'}; }`}</style>
+      <style>{`.pdf-viewer-core .textLayer ::selection { background: ${canAnnotate ? activeColor : 'rgba(255,255,100,0.4)'}; }`}</style>
     </div>
   )
 }
