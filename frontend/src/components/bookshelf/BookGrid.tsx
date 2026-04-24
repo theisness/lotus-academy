@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, PencilSimple, Info, DotsThreeVertical } from '@phosphor-icons/react'
+import { BookOpen, PencilSimple, Info, DotsThreeVertical, DownloadSimple } from '@phosphor-icons/react'
 import type { BookGridProps } from '@/types/components'
 import type { Book } from '@/types/database'
 
@@ -145,6 +145,7 @@ function BookCard({
   onClick,
   onEditClick,
   onInfoClick,
+  onDownload,
   draggable,
   onDragStart,
   onDragOver,
@@ -156,6 +157,7 @@ function BookCard({
   onClick: (book: Book) => void
   onEditClick?: (book: Book) => void
   onInfoClick?: (book: Book) => void
+  onDownload?: (book: Book) => void
   draggable?: boolean
   onDragStart?: () => void
   onDragOver?: (e: React.DragEvent) => void
@@ -262,12 +264,31 @@ function BookCard({
             <PencilSimple size={16} weight="regular" />
           </button>
         )}
+        {onDownload && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDownload(book)
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg
+              bg-[var(--color-surface)]/80 backdrop-blur-sm
+              border border-[var(--color-border)]
+              text-[var(--color-text-muted)]
+              transition-all duration-200
+              hover:bg-[var(--color-surface)] hover:text-[var(--color-accent)]
+              active:scale-[0.98]"
+            aria-label="下载书籍"
+          >
+            <DownloadSimple size={16} weight="regular" />
+          </button>
+        )}
       </div>
     </motion.div>
   )
 }
 
-export function BookGrid({ books, columns, loading, onBookClick, onEditClick, onInfoClick, onReorder, canReorder }: BookGridProps) {
+export function BookGrid({ books, columns, loading, onBookClick, onEditClick, onInfoClick, onDownload, onReorder, canReorder }: BookGridProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
@@ -316,6 +337,7 @@ export function BookGrid({ books, columns, loading, onBookClick, onEditClick, on
           onClick={onBookClick}
           onEditClick={onEditClick}
           onInfoClick={onInfoClick}
+          onDownload={onDownload}
           draggable={canReorder}
           onDragStart={() => handleDragStart(index)}
           onDragOver={(e) => handleDragOver(e, index)}

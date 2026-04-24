@@ -18,5 +18,4 @@ export interface PdfReaderProps {
   currentUserNickname?: string
   bookTitle: string
   onBack: () => void
-  onCopyToPersonal?: () => void
 }

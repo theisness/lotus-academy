@@ -16,7 +16,6 @@ import {
   BookOpen,
   List,
   MagnifyingGlass,
-  Copy,
 } from '@phosphor-icons/react'
 import { HIGHLIGHT_COLORS } from './PdfReader'
 
@@ -65,7 +64,6 @@ interface ReaderToolbarProps {
   onDisplayModeChange: (mode: 'single' | 'double') => void
   searchOpen: boolean
   onToggleSearch: () => void
-  onCopyToPersonal?: () => void
 }
 
 const SCALE_STEPS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
@@ -103,7 +101,6 @@ export function ReaderToolbar({
   onDisplayModeChange,
   searchOpen,
   onToggleSearch,
-  onCopyToPersonal,
 }: ReaderToolbarProps) {
   const [pageInput, setPageInput] = useState(String(currentPage))
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -399,20 +396,6 @@ export function ReaderToolbar({
               )}
             </AnimatePresence>
           </div>
-        )}
-
-        {/* 收藏到个人书架 */}
-        {onCopyToPersonal && (
-          <button
-            onClick={onCopyToPersonal}
-            className="flex h-8 w-8 items-center justify-center rounded-lg
-              text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
-              transition-colors active:scale-[0.98]"
-            aria-label="收藏到个人书架"
-            title="收藏到个人书架"
-          >
-            <Copy size={18} weight="regular" />
-          </button>
         )}
 
         {/* 搜索按钮 */}

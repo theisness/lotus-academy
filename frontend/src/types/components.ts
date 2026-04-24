@@ -13,6 +13,7 @@ export interface BookGridProps {
   onBookClick: (book: Book) => void
   onEditClick?: (book: Book) => void
   onInfoClick?: (book: Book) => void
+  onDownload?: (book: Book) => void
   onReorder?: (bookIds: string[]) => void
   canReorder?: boolean
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calendar, User, FileText, Clock } from '@phosphor-icons/react'
+import { X, Calendar, User, FileText, Clock, Copy } from '@phosphor-icons/react'
 import type { Book } from '@/types/database'
 
 /**
@@ -21,6 +21,7 @@ interface BookInfoDialogProps {
   book: Book
   open: boolean
   onClose: () => void
+  onCopyToPersonal?: () => void
 }
 
 /** 格式化日期 */
@@ -38,7 +39,7 @@ function formatDate(dateString: string | null): string {
   }
 }
 
-export function BookInfoDialog({ book, open, onClose }: BookInfoDialogProps) {
+export function BookInfoDialog({ book, open, onClose, onCopyToPersonal }: BookInfoDialogProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -138,7 +139,21 @@ export function BookInfoDialog({ book, open, onClose }: BookInfoDialogProps) {
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end px-6 pb-6 pt-2">
+            <div className="flex justify-end gap-2 px-6 pb-6 pt-2">
+              {onCopyToPersonal && (
+                <button
+                  type="button"
+                  onClick={onCopyToPersonal}
+                  className="inline-flex items-center gap-1.5 rounded-lg
+                    bg-[var(--color-accent)] px-4 py-2 text-sm font-medium
+                    text-white transition-colors
+                    hover:bg-[var(--color-accent-hover)]
+                    active:scale-[0.98]"
+                >
+                  <Copy size={16} weight="regular" />
+                  收藏到个人书架
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}

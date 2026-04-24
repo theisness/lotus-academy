@@ -228,6 +228,25 @@ updateBook,
     setInfoBook(null)
   }, [])
 
+  const handleCopyToPersonal = useCallback(async () => {
+    if (!infoBook || !user) return
+    const { error } = await supabase.rpc('copy_book_to_personal', { p_book_id: infoBook.id })
+    if (error) { alert('复制失败: ' + error.message); return }
+    alert('已收藏到个人书架')
+    setInfoBook(null)
+  }, [infoBook, user, supabase])
+
+  const handleDownload = useCallback(async (book: Book) => {
+    const { data, error } = await supabase.storage.from('books').download(book.file_path)
+    if (error || !data) { alert('下载失败'); return }
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${book.title}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [supabase])
+
   const handleGroupTagsChange = useCallback(
     async (tags: string[]) => {
       if (!editingBook) return
@@ -565,6 +584,7 @@ updateBook,
           onBookClick={handleBookClick}
           onEditClick={isAdmin ? handleEditClick : undefined}
           onInfoClick={!isAdmin ? handleInfoClick : undefined}
+          onDownload={user ? handleDownload : undefined}
           onReorder={handleReorderBooks}
           canReorder={isAdmin}
         />
@@ -589,6 +609,7 @@ onGroupTagsChange={editingBook.type === 'public' ? handleGroupTagsChange : undef
           book={infoBook}
           open={!!infoBook}
           onClose={handleInfoClose}
+          onCopyToPersonal={infoBook?.type === 'public' && user ? handleCopyToPersonal : undefined}
         />
       )}
 
