@@ -8,6 +8,8 @@ import type { Annotation, Message, UserMessage } from './database'
 export interface AuthResult {
   success: boolean
   error?: string
+  /** 注册成功但需先点确认邮件（没有拿到会话） */
+  needsConfirmation?: boolean
 }
 
 /** 书籍元数据（上传/编辑时使用） */

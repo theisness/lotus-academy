@@ -26,12 +26,13 @@ export function useAuth(): UseAuthReturn {
    * 根据用户 ID 从 profiles 表获取用户资料
    */
   const fetchProfile = useCallback(
-    async (userId: string): Promise<UserProfile | null> => {
+    async (userId: string, email?: string | null): Promise<UserProfile | null> => {
       console.log('[useAuth] fetchProfile called for:', userId)
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
+          // email 列不对普通用户开放（2026-11-09 加固），本人邮箱从登录会话取
+          .select('id, nickname, avatar_url, bio, role, group_tags, page_preference, created_at, updated_at')
           .eq('id', userId)
           .single()
 
@@ -41,7 +42,7 @@ export function useAuth(): UseAuthReturn {
           return null
         }
 
-        return data as UserProfile
+        return { ...data, email: email ?? null } as UserProfile
       } catch (err) {
         console.error('[useAuth] fetchProfile error:', err)
         return null
@@ -90,7 +91,7 @@ export function useAuth(): UseAuthReturn {
         }
         
         console.log('[useAuth] Fetching profile for user:', authUser.id)
-        const profile = await fetchProfile(authUser.id)
+        const profile = await fetchProfile(authUser.id, authUser.email)
         console.log('[useAuth] Profile result:', { profileId: profile?.id, role: profile?.role })
         if (mounted) {
           setUser(profile)
@@ -143,7 +144,7 @@ export function useAuth(): UseAuthReturn {
         try {
           if (session?.user) {
             console.log('[useAuth] Fetching profile for session user:', session.user.id)
-            const profile = await fetchProfile(session.user.id)
+            const profile = await fetchProfile(session.user.id, session.user.email)
             if (mounted) {
               setUser(profile)
               setIsAdmin(profile?.role === 'admin')
@@ -179,7 +180,7 @@ export function useAuth(): UseAuthReturn {
    */
   const signUp = useCallback(
     async (email: string, password: string): Promise<AuthResult> => {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       })
@@ -188,7 +189,8 @@ export function useAuth(): UseAuthReturn {
         return { success: false, error: error.message }
       }
 
-      return { success: true }
+      // 2026-11-09 起注册要先验证邮箱，此时 session 为空
+      return { success: true, needsConfirmation: !data.session }
     },
     [supabase]
   )

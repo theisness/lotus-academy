@@ -29,9 +29,9 @@ export function useUserManagement(): UseUserManagementReturn {
     setLoading(true)
 
     try {
+      // email 只有管理员能看，走 admin_list_profiles()（非管理员会被拒）
       let query = supabase
-        .from('profiles')
-        .select('*')
+        .rpc('admin_list_profiles')
         .order('created_at', { ascending: true })
 
       if (searchQuery.trim()) {

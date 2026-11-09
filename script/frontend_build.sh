@@ -24,7 +24,7 @@ echo -e "\033[32m=== Frontend Build (Static Export) ===\033[0m"
 # 1. Build
 echo -e "\033[36m1/2 npm run build...\033[0m"
 STEP=$SECONDS
-cd "$FRONTEND_DIR" && npm run build && cd "$PROJECT_ROOT"
+(cd "$FRONTEND_DIR" && npm run build)  # 子 shell：构建失败时 set -e 能停住，不会把旧 out/ 打包
 echo -e "\033[90m    ⏱ build: $((SECONDS - STEP))s\033[0m"
 
 # 2. Pack out/ directory

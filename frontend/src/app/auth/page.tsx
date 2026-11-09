@@ -105,6 +105,8 @@ export default function AuthPage() {
             } else {
               setErrors({ general: errorMsg })
             }
+          } else if (result.needsConfirmation) {
+            setRegisterSuccess(true)
           } else {
             router.push('/bookshelf')
           }
